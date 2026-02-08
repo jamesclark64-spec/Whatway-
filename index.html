@@ -3,54 +3,87 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Arrow to a Capital</title>
+  <title>Arrow to a Capital (with Map + Fun Distances)</title>
+
+  <!-- Leaflet (map) -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+
   <style>
     :root { color-scheme: light dark; }
-    body {
+    body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      margin: 0;
-      padding: 16px;
-      display: grid;
-      gap: 12px;
-      max-width: 720px;
-      margin-inline: auto;
+      margin:0;
+      padding:16px;
+      display:grid;
+      gap:12px;
+      max-width: 860px;
+      margin-inline:auto;
     }
-    h1 { font-size: 18px; margin: 0; }
-    .card {
-      border: 1px solid rgba(127,127,127,.35);
-      border-radius: 14px;
-      padding: 14px;
-      display: grid;
-      gap: 12px;
-      background: rgba(127,127,127,.06);
+    h1{ font-size:18px; margin:0; }
+    .card{
+      border:1px solid rgba(127,127,127,.35);
+      border-radius:14px;
+      padding:14px;
+      display:grid;
+      gap:12px;
+      background:rgba(127,127,127,.06);
     }
-    .row { display: grid; gap: 8px; }
-    .row.inline { grid-template-columns: 1fr auto; align-items: center; }
-    label { font-size: 12px; opacity: .85; }
-    select, button {
-      font: inherit;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(127,127,127,.35);
-      background: transparent;
+    label{ font-size:12px; opacity:.85; }
+    select, button{
+      font:inherit;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(127,127,127,.35);
+      background:transparent;
     }
-    button { cursor: pointer; }
-    button:active { transform: translateY(1px); }
-    .muted { font-size: 12px; opacity: .8; }
+    button{ cursor:pointer; }
+    button:active{ transform: translateY(1px); }
+    .row{ display:grid; gap:8px; }
+    .row.inline{ grid-template-columns: 1fr auto auto; gap:8px; align-items:end; }
+    .muted{ font-size:12px; opacity:.8; }
+    .warn{ color:#b00020; }
 
-    /* Arrow area */
-    .arrowWrap {
-      display: grid;
-      place-items: center;
-      min-height: 260px;
-      position: relative;
+    /* Map */
+    #map{
+      width:100%;
+      height: 340px;
+      border-radius:14px;
+      overflow:hidden;
+      border:1px solid rgba(127,127,127,.35);
     }
-    .arrow {
-      width: 0;
-      height: 0;
-      border-left: 26px solid transparent;
-      border-right: 26px solid transparent;
-      border-bottom: 130px solid currentColor; /* triangle arrow */
+
+    /* Arrow */
+    .arrowWrap{
+      display:grid;
+      place-items:center;
+      min-height:240px;
+      position:relative;
+    }
+    .ring{
+      position:absolute;
+      width:220px; height:220px;
+      border-radius:999px;
+      border:1px dashed rgba(127,127,127,.55);
+      opacity:.8;
+    }
+    .nMark{
+      position:absolute;
+      top:6px;
+      font-size:12px;
+      opacity:.85;
+      user-select:none;
+    }
+    .arrow{
+      width:0; height:0;
+      border-left:26px solid transparent;
+      border-right:26px solid transparent;
+      border-bottom:130px solid currentColor;
       transform: rotate(0deg);
       transform-origin: 50% 85%;
       transition: transform 220ms ease;
@@ -66,41 +99,35 @@
       background: currentColor;
       border-radius: 10px;
     }
-    .ring {
-      position:absolute;
-      width: 220px;
-      height: 220px;
-      border-radius: 999px;
-      border: 1px dashed rgba(127,127,127,.55);
-      opacity:.8;
+
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
     }
-    .nMark {
-      position:absolute;
-      top: 6px;
-      font-size: 12px;
-      opacity: .85;
+    @media (max-width: 680px){
+      .row.inline{ grid-template-columns: 1fr; align-items:stretch; }
+      .grid2{ grid-template-columns: 1fr; }
     }
-    .stats {
-      display: grid;
-      gap: 6px;
+    .pill{
+      border:1px solid rgba(127,127,127,.35);
+      border-radius:12px;
+      padding:10px 12px;
+      background:rgba(127,127,127,.05);
+      display:grid;
+      gap:6px;
+    }
+    .big{
+      font-size:18px;
+      font-weight:700;
       font-variant-numeric: tabular-nums;
     }
-    .big {
-      font-size: 18px;
-      font-weight: 700;
+    .funList{
+      margin:0;
+      padding-left: 18px;
+      display:grid;
+      gap:6px;
     }
-    .grid2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .pill {
-      border: 1px solid rgba(127,127,127,.35);
-      border-radius: 12px;
-      padding: 10px 12px;
-      background: rgba(127,127,127,.05);
-    }
-    .warn { color: #b00020; }
   </style>
 </head>
 <body>
@@ -116,15 +143,21 @@
         <label>&nbsp;</label>
         <button id="locateBtn" type="button">📍 Locate me</button>
       </div>
+      <div class="row">
+        <label>&nbsp;</label>
+        <button id="fitBtn" type="button">🗺️ Fit map</button>
+      </div>
     </div>
 
+    <div id="map" aria-label="Map"></div>
+
     <div class="grid2">
-      <div class="pill stats">
+      <div class="pill">
         <div class="muted">Your location</div>
         <div id="you" class="big">Not located yet</div>
         <div id="acc" class="muted"></div>
       </div>
-      <div class="pill stats">
+      <div class="pill">
         <div class="muted">Selected city</div>
         <div id="dest" class="big">—</div>
         <div id="destCoords" class="muted"></div>
@@ -138,16 +171,21 @@
     </div>
 
     <div class="grid2">
-      <div class="pill stats">
+      <div class="pill">
         <div class="muted">Distance</div>
         <div id="distance" class="big">—</div>
         <div class="muted">Great-circle (as the crow flies)</div>
       </div>
-      <div class="pill stats">
+      <div class="pill">
         <div class="muted">Direction</div>
         <div id="bearing" class="big">—</div>
         <div id="compass" class="muted">—</div>
       </div>
+    </div>
+
+    <div class="pill">
+      <div class="muted">Fun distance equivalents</div>
+      <ul id="fun" class="funList"></ul>
     </div>
 
     <div id="msg" class="muted"></div>
@@ -155,18 +193,29 @@
 
 <script>
 (() => {
-  // 6 major capitals (edit this list however you like)
+  // Capital list (edit freely)
   const capitals = [
-    { name: "London, UK",       lat: 51.5074, lon: -0.1278 },
-    { name: "Paris, France",    lat: 48.8566, lon:  2.3522 },
-    { name: "Washington DC, USA", lat: 38.9072, lon: -77.0369 },
-    { name: "Tokyo, Japan",     lat: 35.6762, lon: 139.6503 },
+    { name: "London, UK",          lat: 51.5074, lon: -0.1278 },
+    { name: "Paris, France",       lat: 48.8566, lon:  2.3522 },
+    { name: "Washington DC, USA",  lat: 38.9072, lon: -77.0369 },
+    { name: "Tokyo, Japan",        lat: 35.6762, lon: 139.6503 },
     { name: "Canberra, Australia", lat: -35.2809, lon: 149.1300 },
-    { name: "Ottawa, Canada",   lat: 45.4215, lon: -75.6972 }
+    { name: "Ottawa, Canada",      lat: 45.4215, lon: -75.6972 }
+  ];
+
+  // Fun unit definitions (approx lengths in meters)
+  const funUnits = [
+    { label: "football pitches (105 m)", meters: 105 },
+    { label: "London buses (11.2 m)", meters: 11.2 },
+    { label: "double-decker buses (10.9 m)", meters: 10.9 },
+    { label: "Olympic running tracks (400 m lap)", meters: 400 },
+    { label: "Big Bens (96 m tall)", meters: 96 },
+    { label: "Eiffel Towers (330 m tall)", meters: 330 }
   ];
 
   const elCity = document.getElementById("city");
   const elLocate = document.getElementById("locateBtn");
+  const elFit = document.getElementById("fitBtn");
   const elArrow = document.getElementById("arrow");
   const elYou = document.getElementById("you");
   const elAcc = document.getElementById("acc");
@@ -176,8 +225,10 @@
   const elBearing = document.getElementById("bearing");
   const elCompass = document.getElementById("compass");
   const elMsg = document.getElementById("msg");
+  const elFun = document.getElementById("fun");
 
   let userPos = null; // {lat, lon, acc}
+  let map, youMarker, destMarker, line;
 
   // Populate dropdown
   capitals.forEach((c, i) => {
@@ -190,9 +241,9 @@
   function toRad(deg){ return deg * Math.PI / 180; }
   function toDeg(rad){ return rad * 180 / Math.PI; }
 
-  // Haversine distance (km)
-  function distanceKm(lat1, lon1, lat2, lon2) {
-    const R = 6371.0088;
+  // Haversine distance (m)
+  function distanceM(lat1, lon1, lat2, lon2) {
+    const R = 6371008.8;
     const φ1 = toRad(lat1), φ2 = toRad(lat2);
     const Δφ = toRad(lat2 - lat1);
     const Δλ = toRad(lon2 - lon1);
@@ -201,7 +252,7 @@
     return R * c;
   }
 
-  // Initial bearing (0..360, degrees, from north)
+  // Initial bearing (0..360 degrees from north)
   function bearingDeg(lat1, lon1, lat2, lon2) {
     const φ1 = toRad(lat1), φ2 = toRad(lat2);
     const λ1 = toRad(lon1), λ2 = toRad(lon2);
@@ -212,7 +263,6 @@
   }
 
   function compassLabel(b) {
-    // 16-wind compass
     const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
     const idx = Math.round(b / 22.5) % 16;
     return dirs[idx];
@@ -224,45 +274,137 @@
     return `${Math.abs(lat).toFixed(5)}°${ns}, ${Math.abs(lon).toFixed(5)}°${ew}`;
   }
 
+  function formatDistance(m) {
+    if (m >= 1000000) return `${(m/1000).toFixed(0)} km`;
+    if (m >= 10000) return `${(m/1000).toFixed(1)} km`;
+    if (m >= 1000) return `${(m/1000).toFixed(2)} km`;
+    return `${Math.round(m)} m`;
+  }
+
+  function setFunList(distanceMeters) {
+    elFun.innerHTML = "";
+    // Pick 4 interesting ones each time: always include buses + pitches, then two others
+    const picks = [
+      funUnits.find(u => u.label.startsWith("London buses")),
+      funUnits.find(u => u.label.startsWith("football pitches")),
+      funUnits.find(u => u.label.startsWith("Olympic")),
+      funUnits.find(u => u.label.startsWith("Eiffel"))
+    ].filter(Boolean);
+
+    // Swap in Big Ben if distance is not huge (keeps numbers fun)
+    if (distanceMeters < 200000) {
+      picks[3] = funUnits.find(u => u.label.startsWith("Big Bens"));
+    }
+
+    picks.forEach(u => {
+      const count = distanceMeters / u.meters;
+      const nice =
+        count >= 10000 ? count.toFixed(0) :
+        count >= 1000  ? count.toFixed(0) :
+        count >= 100   ? count.toFixed(0) :
+        count >= 10    ? count.toFixed(1) :
+                         count.toFixed(2);
+
+      const li = document.createElement("li");
+      li.textContent = `${nice} ${u.label}`;
+      elFun.appendChild(li);
+    });
+
+    // Add a “time by plane-ish” and “time walking-ish” for extra fun
+    const planeHours = distanceMeters / (900000); // 900 km/h
+    const walkHours  = distanceMeters / (5000);   // 5 km/h
+    const extra = document.createElement("li");
+    extra.textContent =
+      `~${planeHours.toFixed(1)} hours by jet (900 km/h), or ~${(walkHours/24).toFixed(0)} days walking (5 km/h)`;
+    elFun.appendChild(extra);
+  }
+
+  // --- Map setup ---
+  function initMap() {
+    map = L.map("map", { zoomControl: true }).setView([20, 0], 2);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    youMarker = L.marker([0,0]).addTo(map).bindPopup("You");
+    destMarker = L.marker([0,0]).addTo(map).bindPopup("Destination");
+
+    line = L.polyline([[0,0],[0,0]], { weight: 4, opacity: 0.8 }).addTo(map);
+  }
+
+  function fitMap() {
+    if (!userPos) return;
+    const dest = capitals[Number(elCity.value)];
+    const bounds = L.latLngBounds(
+      [userPos.lat, userPos.lon],
+      [dest.lat, dest.lon]
+    ).pad(0.25);
+    map.fitBounds(bounds, { animate: true });
+  }
+
+  function updateMap() {
+    if (!map) return;
+    const dest = capitals[Number(elCity.value)];
+
+    // Destination marker always updates
+    destMarker.setLatLng([dest.lat, dest.lon]).setPopupContent(dest.name);
+
+    if (!userPos) {
+      // Park "You" marker offscreen-ish
+      youMarker.setLatLng([0,0]).setPopupContent("You (not located yet)");
+      line.setLatLngs([[0,0],[0,0]]);
+      return;
+    }
+
+    youMarker.setLatLng([userPos.lat, userPos.lon]).setPopupContent("You");
+    line.setLatLngs([[userPos.lat, userPos.lon], [dest.lat, dest.lon]]);
+  }
+
+  // --- UI updates ---
   function updateUI() {
     const dest = capitals[Number(elCity.value)];
     elDest.textContent = dest.name;
     elDestCoords.textContent = formatCoord(dest.lat, dest.lon);
+
+    updateMap();
 
     if (!userPos) {
       elDistance.textContent = "—";
       elBearing.textContent = "—";
       elCompass.textContent = "—";
       elArrow.style.transform = `rotate(0deg)`;
+      elFun.innerHTML = "";
       elMsg.innerHTML = `<span class="warn">Tap “Locate me” to enable GPS.</span>`;
       return;
     }
 
     elMsg.textContent = "";
-    const dkm = distanceKm(userPos.lat, userPos.lon, dest.lat, dest.lon);
+
+    const distM = distanceM(userPos.lat, userPos.lon, dest.lat, dest.lon);
     const b = bearingDeg(userPos.lat, userPos.lon, dest.lat, dest.lon);
 
-    elDistance.textContent = dkm >= 1000
-      ? `${(dkm/1000).toFixed(2)}k km`
-      : `${dkm.toFixed(1)} km`;
-
+    elDistance.textContent = formatDistance(distM);
     elBearing.textContent = `${b.toFixed(1)}°`;
     elCompass.textContent = `Compass: ${compassLabel(b)}`;
 
-    // Rotate arrow so that 0° = up (north). Our arrow points up by default.
+    // Arrow points to bearing (north-up)
     elArrow.style.transform = `rotate(${b}deg)`;
 
     elYou.textContent = formatCoord(userPos.lat, userPos.lon);
     elAcc.textContent = userPos.acc ? `Accuracy: ±${Math.round(userPos.acc)} m` : "";
+
+    setFunList(distM);
   }
 
-  async function locate() {
+  function locate() {
     if (!navigator.geolocation) {
       elMsg.innerHTML = `<span class="warn">Geolocation isn’t supported on this device/browser.</span>`;
       return;
     }
 
-    elMsg.textContent = "Requesting location… (you may need to allow permission)";
+    elMsg.textContent = "Requesting location… (allow permission if asked)";
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -273,6 +415,8 @@
         };
         elMsg.textContent = "";
         updateUI();
+        // Center map on you nicely
+        map.setView([userPos.lat, userPos.lon], 12, { animate: true });
       },
       (err) => {
         userPos = null;
@@ -287,11 +431,14 @@
     );
   }
 
-  elLocate.addEventListener("click", locate);
-  elCity.addEventListener("change", updateUI);
-
-  // Initial
+  // Wire up
+  initMap();
   elCity.value = "0";
+  elCity.addEventListener("change", () => { updateUI(); });
+  elLocate.addEventListener("click", locate);
+  elFit.addEventListener("click", fitMap);
+
+  // Initial paint
   updateUI();
 })();
 </script>
