@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Arrow to a Capital (with Map + Fun Distances)</title>
+  <title>Cartoon Compass Arrow to a Capital</title>
 
   <!-- Leaflet (map) -->
   <link rel="stylesheet"
@@ -15,113 +15,213 @@
           crossorigin=""></script>
 
   <style>
-    :root { color-scheme: light dark; }
+    :root{
+      color-scheme: light dark;
+      --outline: rgba(0,0,0,.18);
+      --card: rgba(255,255,255,.72);
+      --cardDark: rgba(20,20,24,.50);
+      --shadow: 0 14px 30px rgba(0,0,0,.18);
+      --popShadow: 0 10px 0 rgba(0,0,0,.12);
+    }
+
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       margin:0;
-      padding:16px;
-      display:grid;
-      gap:12px;
-      max-width: 860px;
-      margin-inline:auto;
-    }
-    h1{ font-size:18px; margin:0; }
-    .card{
-      border:1px solid rgba(127,127,127,.35);
-      border-radius:14px;
       padding:14px;
       display:grid;
       gap:12px;
-      background:rgba(127,127,127,.06);
+      max-width: 900px;
+      margin-inline:auto;
+
+      /* cartoony background */
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255, 196, 92, .35), transparent 40%),
+        radial-gradient(circle at 80% 15%, rgba(115, 232, 255, .30), transparent 45%),
+        radial-gradient(circle at 25% 85%, rgba(255, 120, 214, .25), transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(139, 255, 170, .25), transparent 42%),
+        linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,0));
     }
+
+    h1{
+      margin:0;
+      font-size:18px;
+      letter-spacing: .2px;
+    }
+
+    .card{
+      border: 3px solid rgba(0,0,0,.12);
+      border-radius: 18px;
+      padding: 14px;
+      display:grid;
+      gap:12px;
+      box-shadow: var(--shadow);
+      background: var(--card);
+      backdrop-filter: blur(6px);
+    }
+    @media (prefers-color-scheme: dark){
+      .card{ background: var(--cardDark); border-color: rgba(255,255,255,.12); }
+    }
+
     label{ font-size:12px; opacity:.85; }
+
     select, button{
-      font:inherit;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(127,127,127,.35);
-      background:transparent;
+      font: inherit;
+      padding: 11px 12px;
+      border-radius: 14px;
+      border: 3px solid rgba(0,0,0,.14);
+      background: rgba(255,255,255,.55);
+      box-shadow: var(--popShadow);
     }
-    button{ cursor:pointer; }
-    button:active{ transform: translateY(1px); }
+    @media (prefers-color-scheme: dark){
+      select, button{
+        background: rgba(30,30,34,.55);
+        border-color: rgba(255,255,255,.14);
+        box-shadow: 0 10px 0 rgba(0,0,0,.28);
+      }
+    }
+
+    button{ cursor:pointer; user-select:none; }
+    button:active{ transform: translateY(2px); box-shadow: 0 8px 0 rgba(0,0,0,.12); }
+
     .row{ display:grid; gap:8px; }
     .row.inline{ grid-template-columns: 1fr auto auto; gap:8px; align-items:end; }
+    @media (max-width: 720px){
+      .row.inline{ grid-template-columns: 1fr; }
+    }
+
     .muted{ font-size:12px; opacity:.8; }
-    .warn{ color:#b00020; }
+    .warn{ color: #b00020; font-weight: 700; }
+    .ok{ color: #0a7a2b; font-weight: 700; }
 
     /* Map */
     #map{
       width:100%;
       height: 340px;
-      border-radius:14px;
+      border-radius: 18px;
       overflow:hidden;
-      border:1px solid rgba(127,127,127,.35);
+      border: 3px solid rgba(0,0,0,.12);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
     }
 
-    /* Arrow */
+    /* Stats grid */
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 720px){
+      .grid2{ grid-template-columns: 1fr; }
+    }
+    .pill{
+      border: 3px solid rgba(0,0,0,.12);
+      border-radius: 16px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,.45);
+      box-shadow: var(--popShadow);
+      display:grid;
+      gap:6px;
+    }
+    @media (prefers-color-scheme: dark){
+      .pill{ background: rgba(30,30,34,.45); border-color: rgba(255,255,255,.12); }
+    }
+
+    .big{
+      font-size: 18px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .2px;
+    }
+
+    /* Arrow + compass dial */
     .arrowWrap{
       display:grid;
       place-items:center;
-      min-height:240px;
+      min-height: 260px;
       position:relative;
+      border-radius: 18px;
+      border: 3px solid rgba(0,0,0,.12);
+      background:
+        radial-gradient(circle at center, rgba(255,255,255,.55), rgba(255,255,255,.12)),
+        repeating-conic-gradient(from 0deg,
+          rgba(0,0,0,.10) 0deg 2deg,
+          transparent 2deg 15deg);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
+      overflow:hidden;
     }
-    .ring{
-      position:absolute;
-      width:220px; height:220px;
-      border-radius:999px;
-      border:1px dashed rgba(127,127,127,.55);
-      opacity:.8;
+    @media (prefers-color-scheme: dark){
+      .arrowWrap{
+        background:
+          radial-gradient(circle at center, rgba(30,30,34,.55), rgba(30,30,34,.12)),
+          repeating-conic-gradient(from 0deg,
+            rgba(255,255,255,.10) 0deg 2deg,
+            transparent 2deg 15deg);
+        border-color: rgba(255,255,255,.12);
+      }
     }
-    .nMark{
+
+    .dialLabel{
       position:absolute;
-      top:6px;
-      font-size:12px;
-      opacity:.85;
+      font-weight: 900;
+      text-shadow: 0 2px 0 rgba(0,0,0,.10);
       user-select:none;
+      opacity:.85;
     }
+    .dialN{ top: 10px; }
+    .dialS{ bottom: 10px; }
+    .dialE{ right: 10px; }
+    .dialW{ left: 10px; }
+
     .arrow{
-      width:0; height:0;
-      border-left:26px solid transparent;
-      border-right:26px solid transparent;
-      border-bottom:130px solid currentColor;
+      position:relative;
+      width: 0;
+      height: 0;
+
+      /* thick cartoon arrow head */
+      border-left: 30px solid transparent;
+      border-right: 30px solid transparent;
+      border-bottom: 150px solid currentColor;
+
       transform: rotate(0deg);
-      transform-origin: 50% 85%;
-      transition: transform 220ms ease;
-      filter: drop-shadow(0 10px 12px rgba(0,0,0,.25));
+      transform-origin: 50% 86%;
+      transition: transform 140ms linear;
+
+      /* cartoon outline */
+      filter:
+        drop-shadow(0 12px 0 rgba(0,0,0,.10))
+        drop-shadow(0 16px 24px rgba(0,0,0,.20));
     }
     .arrow::after{
       content:"";
       position:absolute;
-      left:-10px;
-      top:110px;
-      width:20px;
-      height:70px;
+      left:-12px;
+      top:128px;
+      width:24px;
+      height:78px;
       background: currentColor;
-      border-radius: 10px;
+      border-radius: 14px;
+      box-shadow: 0 0 0 4px rgba(0,0,0,.10) inset;
     }
 
-    .grid2{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:10px;
+    .badgeRow{
+      display:flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items:center;
     }
-    @media (max-width: 680px){
-      .row.inline{ grid-template-columns: 1fr; align-items:stretch; }
-      .grid2{ grid-template-columns: 1fr; }
+    .badge{
+      border: 3px solid rgba(0,0,0,.12);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(255,255,255,.45);
+      box-shadow: 0 8px 0 rgba(0,0,0,.10);
+      font-size: 12px;
+      font-weight: 800;
+      user-select:none;
     }
-    .pill{
-      border:1px solid rgba(127,127,127,.35);
-      border-radius:12px;
-      padding:10px 12px;
-      background:rgba(127,127,127,.05);
-      display:grid;
-      gap:6px;
+    @media (prefers-color-scheme: dark){
+      .badge{ background: rgba(30,30,34,.45); border-color: rgba(255,255,255,.12); box-shadow: 0 8px 0 rgba(0,0,0,.28); }
     }
-    .big{
-      font-size:18px;
-      font-weight:700;
-      font-variant-numeric: tabular-nums;
-    }
+
     .funList{
       margin:0;
       padding-left: 18px;
@@ -131,7 +231,7 @@
   </style>
 </head>
 <body>
-  <h1>Arrow to a Capital</h1>
+  <h1>Cartoon Compass Arrow to a Capital</h1>
 
   <div class="card">
     <div class="row inline">
@@ -139,14 +239,22 @@
         <label for="city">Choose a capital city</label>
         <select id="city"></select>
       </div>
+
       <div class="row">
         <label>&nbsp;</label>
         <button id="locateBtn" type="button">📍 Locate me</button>
       </div>
+
       <div class="row">
         <label>&nbsp;</label>
         <button id="fitBtn" type="button">🗺️ Fit map</button>
       </div>
+    </div>
+
+    <div class="badgeRow">
+      <span class="badge" id="modeBadge">Mode: North-up</span>
+      <button id="compassBtn" type="button" title="Enable compass/orientation">🧭 Compass mode</button>
+      <span class="muted" id="headingReadout">Heading: —</span>
     </div>
 
     <div id="map" aria-label="Map"></div>
@@ -164,9 +272,11 @@
       </div>
     </div>
 
-    <div class="arrowWrap">
-      <div class="ring"></div>
-      <div class="nMark">N</div>
+    <div class="arrowWrap" aria-label="Compass dial">
+      <div class="dialLabel dialN">N</div>
+      <div class="dialLabel dialE">E</div>
+      <div class="dialLabel dialS">S</div>
+      <div class="dialLabel dialW">W</div>
       <div id="arrow" class="arrow" aria-label="Direction arrow"></div>
     </div>
 
@@ -193,7 +303,7 @@
 
 <script>
 (() => {
-  // Capital list (edit freely)
+  // Capitals (edit freely)
   const capitals = [
     { name: "London, UK",          lat: 51.5074, lon: -0.1278 },
     { name: "Paris, France",       lat: 48.8566, lon:  2.3522 },
@@ -203,19 +313,24 @@
     { name: "Ottawa, Canada",      lat: 45.4215, lon: -75.6972 }
   ];
 
-  // Fun unit definitions (approx lengths in meters)
+  // Fun units (meters)
   const funUnits = [
     { label: "football pitches (105 m)", meters: 105 },
     { label: "London buses (11.2 m)", meters: 11.2 },
-    { label: "double-decker buses (10.9 m)", meters: 10.9 },
-    { label: "Olympic running tracks (400 m lap)", meters: 400 },
-    { label: "Big Bens (96 m tall)", meters: 96 },
-    { label: "Eiffel Towers (330 m tall)", meters: 330 }
+    { label: "Olympic track laps (400 m)", meters: 400 },
+    { label: "Big Bens (96 m)", meters: 96 },
+    { label: "Eiffel Towers (330 m)", meters: 330 },
+    { label: "Tower Bridges (244 m)", meters: 244 }
   ];
 
+  // Elements
   const elCity = document.getElementById("city");
   const elLocate = document.getElementById("locateBtn");
   const elFit = document.getElementById("fitBtn");
+  const elCompassBtn = document.getElementById("compassBtn");
+  const elModeBadge = document.getElementById("modeBadge");
+  const elHeadingReadout = document.getElementById("headingReadout");
+
   const elArrow = document.getElementById("arrow");
   const elYou = document.getElementById("you");
   const elAcc = document.getElementById("acc");
@@ -227,21 +342,18 @@
   const elMsg = document.getElementById("msg");
   const elFun = document.getElementById("fun");
 
+  // State
   let userPos = null; // {lat, lon, acc}
   let map, youMarker, destMarker, line;
 
-  // Populate dropdown
-  capitals.forEach((c, i) => {
-    const opt = document.createElement("option");
-    opt.value = String(i);
-    opt.textContent = c.name;
-    elCity.appendChild(opt);
-  });
+  // Heading state (degrees from true north, 0..360)
+  let compassEnabled = false;
+  let headingDeg = null; // device heading (0..360)
 
+  // --- Helpers ---
   function toRad(deg){ return deg * Math.PI / 180; }
   function toDeg(rad){ return rad * 180 / Math.PI; }
 
-  // Haversine distance (m)
   function distanceM(lat1, lon1, lat2, lon2) {
     const R = 6371008.8;
     const φ1 = toRad(lat1), φ2 = toRad(lat2);
@@ -252,7 +364,6 @@
     return R * c;
   }
 
-  // Initial bearing (0..360 degrees from north)
   function bearingDeg(lat1, lon1, lat2, lon2) {
     const φ1 = toRad(lat1), φ2 = toRad(lat2);
     const λ1 = toRad(lon1), λ2 = toRad(lon2);
@@ -276,50 +387,56 @@
 
   function formatDistance(m) {
     if (m >= 1000000) return `${(m/1000).toFixed(0)} km`;
-    if (m >= 10000) return `${(m/1000).toFixed(1)} km`;
-    if (m >= 1000) return `${(m/1000).toFixed(2)} km`;
+    if (m >= 10000)   return `${(m/1000).toFixed(1)} km`;
+    if (m >= 1000)    return `${(m/1000).toFixed(2)} km`;
     return `${Math.round(m)} m`;
+  }
+
+  function niceCount(x){
+    if (x >= 10000) return x.toFixed(0);
+    if (x >= 1000)  return x.toFixed(0);
+    if (x >= 100)   return x.toFixed(0);
+    if (x >= 10)    return x.toFixed(1);
+    return x.toFixed(2);
   }
 
   function setFunList(distanceMeters) {
     elFun.innerHTML = "";
-    // Pick 4 interesting ones each time: always include buses + pitches, then two others
+
+    // Pick a set that reads nicely at all scales
     const picks = [
       funUnits.find(u => u.label.startsWith("London buses")),
       funUnits.find(u => u.label.startsWith("football pitches")),
-      funUnits.find(u => u.label.startsWith("Olympic")),
+      funUnits.find(u => u.label.startsWith("Tower Bridges")),
       funUnits.find(u => u.label.startsWith("Eiffel"))
     ].filter(Boolean);
 
-    // Swap in Big Ben if distance is not huge (keeps numbers fun)
-    if (distanceMeters < 200000) {
-      picks[3] = funUnits.find(u => u.label.startsWith("Big Bens"));
+    // If it's not massive, swap Eiffel for Big Ben for better vibes
+    if (distanceMeters < 250000) {
+      const bb = funUnits.find(u => u.label.startsWith("Big Bens"));
+      if (bb) picks[picks.length - 1] = bb;
     }
 
-    picks.forEach(u => {
-      const count = distanceMeters / u.meters;
-      const nice =
-        count >= 10000 ? count.toFixed(0) :
-        count >= 1000  ? count.toFixed(0) :
-        count >= 100   ? count.toFixed(0) :
-        count >= 10    ? count.toFixed(1) :
-                         count.toFixed(2);
-
+    for (const u of picks) {
       const li = document.createElement("li");
-      li.textContent = `${nice} ${u.label}`;
+      li.textContent = `${niceCount(distanceMeters / u.meters)} ${u.label}`;
       elFun.appendChild(li);
-    });
+    }
 
-    // Add a “time by plane-ish” and “time walking-ish” for extra fun
-    const planeHours = distanceMeters / (900000); // 900 km/h
-    const walkHours  = distanceMeters / (5000);   // 5 km/h
+    // Bonus travel-time sillies
+    const planeHours = distanceMeters / 900000; // 900 km/h
+    const walkDays = (distanceMeters / 5000) / 24; // 5 km/h
     const extra = document.createElement("li");
-    extra.textContent =
-      `~${planeHours.toFixed(1)} hours by jet (900 km/h), or ~${(walkHours/24).toFixed(0)} days walking (5 km/h)`;
+    extra.textContent = `~${planeHours.toFixed(1)} hours by jet (900 km/h), or ~${walkDays.toFixed(0)} days walking (5 km/h)`;
     elFun.appendChild(extra);
   }
 
-  // --- Map setup ---
+  function normalize360(d){
+    d = d % 360;
+    return d < 0 ? d + 360 : d;
+  }
+
+  // --- Map ---
   function initMap() {
     map = L.map("map", { zoomControl: true }).setView([20, 0], 2);
 
@@ -331,7 +448,7 @@
     youMarker = L.marker([0,0]).addTo(map).bindPopup("You");
     destMarker = L.marker([0,0]).addTo(map).bindPopup("Destination");
 
-    line = L.polyline([[0,0],[0,0]], { weight: 4, opacity: 0.8 }).addTo(map);
+    line = L.polyline([[0,0],[0,0]], { weight: 4, opacity: 0.85 }).addTo(map);
   }
 
   function fitMap() {
@@ -345,14 +462,10 @@
   }
 
   function updateMap() {
-    if (!map) return;
     const dest = capitals[Number(elCity.value)];
-
-    // Destination marker always updates
     destMarker.setLatLng([dest.lat, dest.lon]).setPopupContent(dest.name);
 
     if (!userPos) {
-      // Park "You" marker offscreen-ish
       youMarker.setLatLng([0,0]).setPopupContent("You (not located yet)");
       line.setLatLngs([[0,0],[0,0]]);
       return;
@@ -362,48 +475,83 @@
     line.setLatLngs([[userPos.lat, userPos.lon], [dest.lat, dest.lon]]);
   }
 
-  // --- UI updates ---
+  // --- UI + arrow ---
+  function setModeBadge() {
+    if (compassEnabled && headingDeg != null) {
+      elModeBadge.textContent = "Mode: Compass (relative)";
+      elModeBadge.className = "badge ok";
+    } else {
+      elModeBadge.textContent = "Mode: North-up";
+      elModeBadge.className = "badge";
+    }
+  }
+
+  function updateArrow(bearingToTarget) {
+    // North-up: arrow rotation = bearing
+    // Compass mode: arrow rotation = bearing - deviceHeading
+    let rotation = bearingToTarget;
+
+    if (compassEnabled && headingDeg != null) {
+      rotation = normalize360(bearingToTarget - headingDeg);
+    }
+
+    elArrow.style.transform = `rotate(${rotation}deg)`;
+  }
+
   function updateUI() {
     const dest = capitals[Number(elCity.value)];
     elDest.textContent = dest.name;
     elDestCoords.textContent = formatCoord(dest.lat, dest.lon);
 
     updateMap();
+    setModeBadge();
 
     if (!userPos) {
       elDistance.textContent = "—";
       elBearing.textContent = "—";
       elCompass.textContent = "—";
-      elArrow.style.transform = `rotate(0deg)`;
+      elHeadingReadout.textContent = "Heading: —";
       elFun.innerHTML = "";
-      elMsg.innerHTML = `<span class="warn">Tap “Locate me” to enable GPS.</span>`;
+      elMsg.innerHTML = `<span class="warn">Tap “Locate me” first, then (optional) enable compass mode.</span>`;
+      updateArrow(0);
       return;
     }
-
-    elMsg.textContent = "";
 
     const distM = distanceM(userPos.lat, userPos.lon, dest.lat, dest.lon);
     const b = bearingDeg(userPos.lat, userPos.lon, dest.lat, dest.lon);
 
     elDistance.textContent = formatDistance(distM);
     elBearing.textContent = `${b.toFixed(1)}°`;
-    elCompass.textContent = `Compass: ${compassLabel(b)}`;
-
-    // Arrow points to bearing (north-up)
-    elArrow.style.transform = `rotate(${b}deg)`;
+    elCompass.textContent = `Bearing: ${compassLabel(b)} (${b.toFixed(1)}°)`;
 
     elYou.textContent = formatCoord(userPos.lat, userPos.lon);
     elAcc.textContent = userPos.acc ? `Accuracy: ±${Math.round(userPos.acc)} m` : "";
 
+    if (headingDeg == null) {
+      elHeadingReadout.textContent = "Heading: —";
+    } else {
+      elHeadingReadout.textContent = `Heading: ${headingDeg.toFixed(0)}° (${compassLabel(headingDeg)})`;
+    }
+
     setFunList(distM);
+
+    // Arrow rotation depends on compass mode
+    updateArrow(b);
+
+    // Message if compass requested but no data
+    if (compassEnabled && headingDeg == null) {
+      elMsg.innerHTML = `<span class="warn">Compass enabled, but no heading data yet. Try moving the phone in a figure-8, and ensure motion/compass permission is allowed.</span>`;
+    } else {
+      elMsg.textContent = "";
+    }
   }
 
+  // --- GPS ---
   function locate() {
     if (!navigator.geolocation) {
       elMsg.innerHTML = `<span class="warn">Geolocation isn’t supported on this device/browser.</span>`;
       return;
     }
-
     elMsg.textContent = "Requesting location… (allow permission if asked)";
 
     navigator.geolocation.getCurrentPosition(
@@ -414,9 +562,8 @@
           acc: pos.coords.accuracy
         };
         elMsg.textContent = "";
-        updateUI();
-        // Center map on you nicely
         map.setView([userPos.lat, userPos.lon], 12, { animate: true });
+        updateUI();
       },
       (err) => {
         userPos = null;
@@ -431,16 +578,102 @@
     );
   }
 
-  // Wire up
+  // --- Compass / heading ---
+  function tryStartDeviceOrientation() {
+    // Uses:
+    // - iOS: event.webkitCompassHeading (degrees)
+    // - Others: event.alpha (0..360) from DeviceOrientationEvent (often requires permission on iOS)
+    function handler(ev) {
+      // iOS Safari gives webkitCompassHeading (0=N)
+      if (typeof ev.webkitCompassHeading === "number") {
+        headingDeg = normalize360(ev.webkitCompassHeading);
+      } else if (typeof ev.alpha === "number") {
+        // On many Android devices: alpha is degrees clockwise from north (but can vary by implementation)
+        // We'll treat it as 0..360 heading and normalize.
+        headingDeg = normalize360(ev.alpha);
+      } else {
+        headingDeg = null;
+      }
+      updateUI();
+    }
+
+    // Keep only one listener
+    window.removeEventListener("deviceorientationabsolute", handler, true);
+    window.removeEventListener("deviceorientation", handler, true);
+
+    // Prefer absolute when available
+    if ("ondeviceorientationabsolute" in window) {
+      window.addEventListener("deviceorientationabsolute", handler, true);
+    } else {
+      window.addEventListener("deviceorientation", handler, true);
+    }
+  }
+
+  async function enableCompassMode() {
+    compassEnabled = true;
+    setModeBadge();
+    elMsg.textContent = "";
+
+    // iOS 13+ requires explicit permission request
+    const DOE = window.DeviceOrientationEvent;
+    if (DOE && typeof DOE.requestPermission === "function") {
+      try {
+        const res = await DOE.requestPermission();
+        if (res !== "granted") {
+          compassEnabled = false;
+          headingDeg = null;
+          elMsg.innerHTML = `<span class="warn">Motion/compass permission was not granted. Compass mode turned off.</span>`;
+          updateUI();
+          return;
+        }
+      } catch (e) {
+        compassEnabled = false;
+        headingDeg = null;
+        elMsg.innerHTML = `<span class="warn">Couldn’t request motion permission. Compass mode turned off.</span>`;
+        updateUI();
+        return;
+      }
+    }
+
+    tryStartDeviceOrientation();
+
+    // Give a gentle hint
+    elMsg.innerHTML = `<span class="muted">If the heading seems stuck, wave the phone in a figure-8 to help calibration.</span>`;
+    updateUI();
+  }
+
+  function toggleCompass() {
+    if (compassEnabled) {
+      compassEnabled = false;
+      headingDeg = null;
+      elMsg.textContent = "Compass mode off (north-up).";
+      updateUI();
+      return;
+    }
+    enableCompassMode();
+  }
+
+  // --- Init ---
+  // Dropdown
+  capitals.forEach((c, i) => {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = c.name;
+    elCity.appendChild(opt);
+  });
+
   initMap();
   elCity.value = "0";
-  elCity.addEventListener("change", () => { updateUI(); });
+
+  // Wire up
+  elCity.addEventListener("change", updateUI);
   elLocate.addEventListener("click", locate);
   elFit.addEventListener("click", fitMap);
+  elCompassBtn.addEventListener("click", toggleCompass);
 
-  // Initial paint
+  // First render
   updateUI();
 })();
 </script>
 </body>
-</html>
+          </html>
