@@ -210,13 +210,14 @@
       <div class="panelBody">
         <div class="row">
           <button class="btn" id="rect3Btn">Rectangle (3 pts)</button>
-          <button class="btn secondary" id="polyBtn">Polygon (click points)</button>
+          <button class="btn secondary" id="polyBtn">Polygon</button>
+          <button class="btn secondary" id="circleBtn">Circle (centre + radius)</button>
         </div>
 
         <div class="row">
-          <button class="btn secondary" id="finishShapeBtn" disabled>Finish shape</button>
+          <button class="btn secondary" id="finishShapeBtn" disabled>Finish polygon</button>
           <button class="btn secondary" id="undoBtn" disabled>Undo</button>
-          <button class="btn danger" id="clearShapeBtn" disabled>Clear shape</button>
+          <button class="btn danger" id="clearShapeBtn" disabled>Clear</button>
         </div>
 
         <div class="row">
@@ -253,39 +254,55 @@
             <input id="gridSpacing" type="number" min="0.1" step="0.1" value="10" />
             <div class="hint" id="spacingHint">Locked to 10.000m (snap ON)</div>
           </div>
+
+          <div class="field">
+            <label for="circleRadius">Circle radius (m)</label>
+            <input id="circleRadius" type="number" min="0.001" step="0.1" value="5" />
+            <div class="hint">Used when placing a circle boundary</div>
+          </div>
+
           <div class="field">
             <label for="gridLayer">Grid layer (DXF)</label>
             <input id="gridLayer" type="text" value="GRID" />
           </div>
           <div class="field">
-            <label for="shapeLayer">Shape layer (DXF)</label>
+            <label for="shapeLayer">Boundary layer (DXF)</label>
             <input id="shapeLayer" type="text" value="BOUNDARY" />
           </div>
+
           <div class="field">
             <label for="simplifyTol">Boundary simplify (m)</label>
             <input id="simplifyTol" type="number" min="0" step="0.1" value="0.5" />
           </div>
+
           <div class="field">
             <label>Shape</label>
             <div style="font-size:14px;font-weight:950;color:#111827;" id="shapeInfo">None</div>
           </div>
+
           <div class="field">
             <label>Grid angle (deg)</label>
             <div style="font-size:14px;font-weight:950;color:#111827;" id="gridAngDeg">0.000</div>
+          </div>
+
+          <div class="field">
+            <label>Circle</label>
+            <div style="font-size:14px;font-weight:950;color:#111827;" id="circleInfo">None</div>
           </div>
         </div>
 
         <div class="status" id="statusBox">Starting…</div>
 
         <div class="mini">
-          Rectangle: P1, P2 (baseline), P3 (width). Polygon: click points then Finish.
-          “True North (ortho)” exports perfectly square in CAD. Export: Grid BLUE, Shape RED.
+          Rectangle/Polygon/Circle are all boundary options.
+          Grid preview + export are clipped inside the current boundary.
+          Circle boundary exports as a DXF CIRCLE on the BOUNDARY layer.
         </div>
 
         <div class="divider"></div>
 
         <div class="mini">
-          Tip: Toggle crosshair ON to pan/zoom precisely, then click to place points at the map centre.
+          Tip: Crosshair ON lets you pan/zoom then click to place picks at map centre.
         </div>
       </div>
     </aside>
@@ -323,15 +340,21 @@
 
   const gridSpacingEl = document.getElementById('gridSpacing');
   const spacingHintEl = document.getElementById('spacingHint');
+
+  const circleRadiusEl = document.getElementById('circleRadius');
+
   const gridLayerEl = document.getElementById('gridLayer');
   const shapeLayerEl = document.getElementById('shapeLayer');
   const simplifyTolEl = document.getElementById('simplifyTol');
 
   const shapeInfoEl = document.getElementById('shapeInfo');
   const gridAngDegEl = document.getElementById('gridAngDeg');
+  const circleInfoEl = document.getElementById('circleInfo');
 
   const rect3Btn = document.getElementById('rect3Btn');
   const polyBtn = document.getElementById('polyBtn');
+  const circleBtn = document.getElementById('circleBtn');
+
   const finishShapeBtn = document.getElementById('finishShapeBtn');
   const undoBtn = document.getElementById('undoBtn');
   const clearShapeBtn = document.getElementById('clearShapeBtn');
@@ -359,6 +382,10 @@
       spacingHintEl.textContent = 'Variable spacing (snap OFF)';
     }
   }
+  function getCircleRadius(){
+    const r = parseFloat(circleRadiusEl.value);
+    return (Number.isFinite(r) && r > 0) ? r : NaN;
+  }
 
   // ---------------------------
   // OSGB36(15) / OSTN15
@@ -369,7 +396,6 @@
     '+x_0=400000 +y_0=-100000 +ellps=airy +units=m +no_defs +type=crs';
 
   proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
-  let ostnReady = false;
 
   async function loadOSTN15() {
     try {
@@ -377,7 +403,6 @@
       const tiff = await GeoTIFF.fromUrl(OSTN15_TIFF_URL);
       await proj4.nadgrid('OSTN15_NTv2_OSGBtoETRS', tiff).ready;
       proj4.defs('EPSG:27700', EPSG27700_DEF_BASE + ' +nadgrids=OSTN15_NTv2_OSGBtoETRS');
-      ostnReady = true;
       statusBox.textContent = 'OSTN15 loaded ✅ (OSGB36(15) accurate)';
       exportBtn.disabled = false;
       redrawAll();
@@ -391,7 +416,6 @@
         '+towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 ' +
         '+units=m +no_defs +type=crs'
       );
-      ostnReady = false;
       exportBtn.disabled = false;
       redrawAll();
     }
@@ -445,22 +469,27 @@
   // ---------------------------
   // State
   // ---------------------------
-  let mode = 'idle'; // idle | rect3 | poly | pickAngle
+  let mode = 'idle'; // idle | rect3 | poly | pickAngle | circle
   function setMode(m){
     mode = m;
     modeBadge.textContent =
       m === 'rect3' ? 'rect: pick P1' :
       m === 'poly' ? 'poly: click points' :
       m === 'pickAngle' ? 'pick angle' :
+      m === 'circle' ? 'circle: pick centre' :
       'idle';
   }
 
-  let shapeType = null;     // 'rect' | 'poly' | null
+  let shapeType = null;     // 'rect' | 'poly' | 'circle' | null
   let polyEN = [];
 
   let rP1=null, rP2=null, rP3=null;
   let rectU=null, rectLen=0, rectWid=0;
   let rectCornersEN=null;
+
+  // Circle boundary state
+  let circleCenterEN = null;
+  let circleRadiusM = NaN;
 
   let a1=null, a2=null;
   let pickedBasis = null;
@@ -470,6 +499,7 @@
   let exportOriginEN = null;
 
   function setShapeInfo(text){ shapeInfoEl.textContent = text; }
+  function setCircleInfo(text){ circleInfoEl.textContent = text; }
   function updateGridAngleDisplay(){
     gridAngDegEl.textContent = (gridAngleRad*180/Math.PI).toFixed(3);
   }
@@ -485,9 +515,7 @@
     if (L < 0.001) return null;
     const u = unit(v);
 
-    // perpendicular left
-    const w0 = { e: -u.n, n: u.e };
-
+    const w0 = { e: -u.n, n: u.e }; // perp left
     const widthSigned = dot(sub(p3,p1), w0);
     const W = Math.abs(widthSigned);
     if (W < 0.001) return null;
@@ -503,37 +531,69 @@
 
   function drawShapeClosed(){
     shapeLayer.clearLayers();
+
     if (shapeType === 'rect' && rectCornersEN){
       const ring = [...rectCornersEN, rectCornersEN[0]].map(p => enToLatLng(p.e,p.n));
       L.polyline(ring, {weight:3, opacity:0.9}).addTo(shapeLayer);
-    } else if (shapeType === 'poly' && polyEN.length>=2){
+      return;
+    }
+
+    if (shapeType === 'poly' && polyEN.length>=2){
       const ring = polyEN.map(p => enToLatLng(p.e,p.n));
       L.polyline(ring, {weight:3, opacity:0.9}).addTo(shapeLayer);
+      return;
+    }
+
+    if (shapeType === 'circle' && circleCenterEN && Number.isFinite(circleRadiusM) && circleRadiusM > 0){
+      const ll = enToLatLng(circleCenterEN.e, circleCenterEN.n);
+      L.circle(ll, { radius: circleRadiusM, weight:3, opacity:0.9, fillOpacity:0.0 }).addTo(shapeLayer);
+      L.circleMarker(ll, { radius: 6, weight:2, opacity:0.95, fillOpacity:0.25 }).addTo(shapeLayer);
+      return;
     }
   }
 
   function shapeBoundsEN(){
-    let pts = [];
-    if (shapeType === 'rect' && rectCornersEN) pts = rectCornersEN;
-    if (shapeType === 'poly' && polyEN.length>=3) pts = polyEN;
-    if (!pts.length) return null;
-    let minE=Infinity, minN=Infinity, maxE=-Infinity, maxN=-Infinity;
-    for (const p of pts){
-      minE=Math.min(minE,p.e); minN=Math.min(minN,p.n);
-      maxE=Math.max(maxE,p.e); maxN=Math.max(maxN,p.n);
+    if (shapeType === 'rect' && rectCornersEN){
+      let minE=Infinity, minN=Infinity, maxE=-Infinity, maxN=-Infinity;
+      for (const p of rectCornersEN){
+        minE=Math.min(minE,p.e); minN=Math.min(minN,p.n);
+        maxE=Math.max(maxE,p.e); maxN=Math.max(maxN,p.n);
+      }
+      return {minE,minN,maxE,maxN};
     }
-    return {minE,minN,maxE,maxN};
+
+    if (shapeType === 'poly' && polyEN.length>=3){
+      let minE=Infinity, minN=Infinity, maxE=-Infinity, maxN=-Infinity;
+      for (const p of polyEN){
+        minE=Math.min(minE,p.e); minN=Math.min(minN,p.n);
+        maxE=Math.max(maxE,p.e); maxN=Math.max(maxN,p.n);
+      }
+      return {minE,minN,maxE,maxN};
+    }
+
+    if (shapeType === 'circle' && circleCenterEN && Number.isFinite(circleRadiusM) && circleRadiusM > 0){
+      const c = circleCenterEN, r = circleRadiusM;
+      return { minE: c.e - r, maxE: c.e + r, minN: c.n - r, maxN: c.n + r };
+    }
+
+    return null;
   }
 
   function resolveGridBasis(){
     const ori = getGridOriMode();
 
+    // For circle there is no baseline; "shape baseline" should behave like north-up.
+    const shapeHasBaseline = (shapeType === 'rect' && rectU);
+
+    // choose a reference point for any north/picked basis
     let refLL = null;
     if (shapeType === 'rect' && rP1) refLL = enToLatLng(rP1.e, rP1.n);
     else if (shapeType === 'poly' && polyEN.length){
       let se=0,sn=0;
       for (const p of polyEN){ se+=p.e; sn+=p.n; }
       refLL = enToLatLng(se/polyEN.length, sn/polyEN.length);
+    } else if (shapeType === 'circle' && circleCenterEN){
+      refLL = enToLatLng(circleCenterEN.e, circleCenterEN.n);
     } else {
       refLL = map.getCenter();
     }
@@ -543,7 +603,7 @@
     } else if (ori === 'picked'){
       gridBasis = pickedBasis || pageNorthBasisAtLatLng(refLL) || {gx:{e:1,n:0}, gy:{e:0,n:1}};
     } else {
-      if (shapeType === 'rect' && rectU){
+      if (shapeHasBaseline){
         gridBasis = basisFromBaselineU(rectU);
       } else {
         gridBasis = pageNorthBasisAtLatLng(refLL) || {gx:{e:1,n:0}, gy:{e:0,n:1}};
@@ -555,17 +615,16 @@
   }
 
   // ---------------------------
-  // Clipping helpers
+  // Polygon clipping helpers
   // ---------------------------
   function segmentIntersection(p, r, q, s){
     const rxs = r.e*s.n - r.n*s.e;
     const qmp = sub(q,p);
-    const qmpxr = qmp.e*r.n - qmp.n*r.e;
     if (Math.abs(rxs) < 1e-12) return null;
     const t = (qmp.e*s.n - qmp.n*s.e) / rxs;
-    const u = qmpxr / rxs;
+    const u = (qmp.e*r.n - qmp.n*r.e) / rxs;
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1){
-      return {t,u, pt: add(p, mul(r, t))};
+      return {t, pt: add(p, mul(r, t))};
     }
     return null;
   }
@@ -617,24 +676,73 @@
   }
 
   // ---------------------------
+  // Circle clipping helper
+  // ---------------------------
+  function clipLineToCircle(A, B, C, r){
+    // Returns 0 or 1 segment(s) of AB that lie inside the circle.
+    const d = sub(B, A);          // direction
+    const f = sub(A, C);          // from centre to A
+
+    const a = dot(d,d);
+    if (a < 1e-12) return [];
+
+    const b = 2 * dot(f,d);
+    const c = dot(f,f) - r*r;
+
+    const disc = b*b - 4*a*c;
+    if (disc < 0) {
+      // No intersections; either fully inside or outside.
+      const Ainside = (dot(sub(A,C), sub(A,C)) <= r*r);
+      const Binside = (dot(sub(B,C), sub(B,C)) <= r*r);
+      return (Ainside && Binside) ? [{a:A, b:B}] : [];
+    }
+
+    const s = Math.sqrt(disc);
+    const t1 = (-b - s) / (2*a);
+    const t2 = (-b + s) / (2*a);
+
+    const lo = Math.max(0, Math.min(t1,t2));
+    const hi = Math.min(1, Math.max(t1,t2));
+
+    // segment of parameter t inside circle is [lo, hi], but only if it has length
+    if (hi < 0 || lo > 1 || hi - lo < 1e-12) {
+      // Might still be fully inside (t range could miss 0..1)
+      const Ainside = (dot(sub(A,C), sub(A,C)) <= r*r);
+      const Binside = (dot(sub(B,C), sub(B,C)) <= r*r);
+      return (Ainside && Binside) ? [{a:A, b:B}] : [];
+    }
+
+    const P = add(A, mul(d, lo));
+    const Q = add(A, mul(d, hi));
+
+    return [{a:P, b:Q}];
+  }
+
+  // ---------------------------
   // Draw grid (preview)
   // ---------------------------
   function redrawAll(){
     gridLayer.clearLayers();
-
-    const hasRect = (shapeType==='rect' && rectCornersEN);
-    const hasPoly = (shapeType==='poly' && polyEN.length>=3);
     drawShapeClosed();
 
-    if (!hasRect && !hasPoly) return;
+    const hasBoundary =
+      (shapeType === 'rect' && rectCornersEN) ||
+      (shapeType === 'poly' && polyEN.length>=3) ||
+      (shapeType === 'circle' && circleCenterEN && Number.isFinite(circleRadiusM) && circleRadiusM > 0);
+
+    if (!hasBoundary) return;
 
     resolveGridBasis();
 
     const spacing = getSpacingMeters();
     if (!Number.isFinite(spacing) || spacing <= 0) return;
 
-    const clipPoly = hasRect ? rectCornersEN : polyEN;
-    exportOriginEN = hasRect ? rP1 : polyEN[0];
+    // export origin for relative mode:
+    exportOriginEN =
+      (shapeType === 'rect' && rP1) ? rP1 :
+      (shapeType === 'poly' && polyEN.length) ? polyEN[0] :
+      (shapeType === 'circle' && circleCenterEN) ? circleCenterEN :
+      null;
 
     const b = shapeBoundsEN();
     if (!b) return;
@@ -669,22 +777,29 @@
       L.polyline([enToLatLng(a.e,a.n), enToLatLng(b.e,b.n)], {weight:2, opacity:0.85}).addTo(gridLayer);
     }
 
+    function clipAndDraw(A,B2){
+      let segs = [];
+      if (shapeType === 'rect' && rectCornersEN) segs = clipLineToPolygon(A,B2,rectCornersEN);
+      else if (shapeType === 'poly' && polyEN.length>=3) segs = clipLineToPolygon(A,B2,polyEN);
+      else if (shapeType === 'circle' && circleCenterEN) segs = clipLineToCircle(A,B2,circleCenterEN,circleRadiusM);
+
+      for (const s of segs) drawSeg(s.a, s.b);
+    }
+
     for (let x = startX; x <= endX + 1e-9; x += spacing){
       const A = fromGrid(x, startY - big);
       const B2 = fromGrid(x, endY + big);
-      const segs = clipLineToPolygon(A,B2,clipPoly);
-      for (const s of segs) drawSeg(s.a, s.b);
+      clipAndDraw(A,B2);
     }
     for (let y = startY; y <= endY + 1e-9; y += spacing){
       const A = fromGrid(startX - big, y);
       const B2 = fromGrid(endX + big, y);
-      const segs = clipLineToPolygon(A,B2,clipPoly);
-      for (const s of segs) drawSeg(s.a, s.b);
+      clipAndDraw(A,B2);
     }
   }
 
   // ---------------------------
-  // Boundary simplify helpers
+  // Boundary simplify helpers (poly only)
   // ---------------------------
   function removeNearDuplicates(pts, eps=0.001){
     const out = [];
@@ -750,9 +865,23 @@
     ].join(EOL) + EOL;
   }
 
+  function dxfCircleEntity(x, y, r, layer, aciColor){
+    if (![x,y,r].every(Number.isFinite) || r <= 0) return "";
+    return [
+      "0","CIRCLE",
+      "8", layer,
+      "62", String(aciColor),
+      "10", x.toFixed(3),
+      "20", y.toFixed(3),
+      "30", "0.000",
+      "40", r.toFixed(3)
+    ].join(EOL) + EOL;
+  }
+
   function exportBoundaryAsLines(pointsXY, layer, aciColor, closed=true) {
     let out = "";
     if (!pointsXY || pointsXY.length < 2) return out;
+
     for (let i = 0; i < pointsXY.length - 1; i++) {
       const a = pointsXY[i], b = pointsXY[i+1];
       out += dxfLineEntity(a.x, a.y, b.x, b.y, layer, aciColor);
@@ -771,21 +900,34 @@
   }
 
   function exportDXF(){
-    const hasRect = (shapeType==='rect' && rectCornersEN);
-    const hasPoly = (shapeType==='poly' && polyEN.length>=3);
-    if (!hasRect && !hasPoly){ alert('Create a rectangle or polygon first.'); return; }
+    const hasBoundary =
+      (shapeType === 'rect' && rectCornersEN) ||
+      (shapeType === 'poly' && polyEN.length>=3) ||
+      (shapeType === 'circle' && circleCenterEN && Number.isFinite(circleRadiusM) && circleRadiusM > 0);
+
+    if (!hasBoundary){
+      alert('Create a Rectangle, Polygon, or Circle boundary first.');
+      return;
+    }
 
     resolveGridBasis();
 
     const spacing = getSpacingMeters();
-    if (!Number.isFinite(spacing) || spacing <= 0){ alert('Grid spacing must be > 0'); return; }
+    if (!Number.isFinite(spacing) || spacing <= 0){
+      alert('Grid spacing must be > 0');
+      return;
+    }
 
     const gridLayerName = (gridLayerEl.value || 'GRID').trim();
     const shpLayerName  = (shapeLayerEl.value || 'BOUNDARY').trim();
     const rel = !!relativeExportEl.checked;
 
-    const clipPoly = hasRect ? rectCornersEN : polyEN;
-    exportOriginEN = exportOriginEN || clipPoly[0];
+    exportOriginEN =
+      (shapeType === 'rect' && rP1) ? rP1 :
+      (shapeType === 'poly' && polyEN.length) ? polyEN[0] :
+      (shapeType === 'circle' && circleCenterEN) ? circleCenterEN :
+      null;
+
     const origin = exportOriginEN;
 
     function outXY(p){
@@ -828,11 +970,18 @@
     dxf += ["0","SECTION","2","TABLES","0","ENDSEC"].join(EOL) + EOL;
     dxf += ["0","SECTION","2","ENTITIES"].join(EOL) + EOL;
 
+    function clipLine(A,B2){
+      if (shapeType === 'rect' && rectCornersEN) return clipLineToPolygon(A,B2,rectCornersEN);
+      if (shapeType === 'poly' && polyEN.length>=3) return clipLineToPolygon(A,B2,polyEN);
+      if (shapeType === 'circle' && circleCenterEN) return clipLineToCircle(A,B2,circleCenterEN,circleRadiusM);
+      return [];
+    }
+
     // Grid BLUE
     for (let x = startX; x <= endX + 1e-9; x += spacing){
       const A = fromGrid(x, startY - big);
       const B2 = fromGrid(x, endY + big);
-      const segs = clipLineToPolygon(A,B2,clipPoly);
+      const segs = clipLine(A,B2);
       for (const s of segs){
         const a = outXY(s.a), b2 = outXY(s.b);
         if (!a || !b2) continue;
@@ -843,7 +992,7 @@
     for (let y = startY; y <= endY + 1e-9; y += spacing){
       const A = fromGrid(startX - big, y);
       const B2 = fromGrid(endX + big, y);
-      const segs = clipLineToPolygon(A,B2,clipPoly);
+      const segs = clipLine(A,B2);
       for (const s of segs){
         const a = outXY(s.a), b2 = outXY(s.b);
         if (!a || !b2) continue;
@@ -852,32 +1001,38 @@
       }
     }
 
-    // Boundary RED as LINE segments
-    const tol = Math.max(0, parseFloat(simplifyTolEl.value) || 0);
-    let shp = removeNearDuplicates(clipPoly.slice(), 0.001);
+    // Boundary RED
+    if (shapeType === 'circle' && circleCenterEN){
+      const cxy = outXY(circleCenterEN);
+      if (cxy){
+        dxf += dxfCircleEntity(cxy.x, cxy.y, circleRadiusM, shpLayerName, DXF_COLOR_RED);
+        entities++;
+      }
+    } else {
+      const tol = Math.max(0, parseFloat(simplifyTolEl.value) || 0);
+      let shp = [];
 
-    if (shp.length >= 3){
-      const closed = shp.concat([shp[0]]);
-      const simplified = rdpSimplify(closed, tol);
-      const finalPts = simplified.slice(0, -1);
-      const ptsXY = finalPts.map(outXY).filter(Boolean);
-      dxf += exportBoundaryAsLines(ptsXY, shpLayerName, DXF_COLOR_RED, true);
-      entities += ptsXY.length;
+      if (shapeType === 'rect' && rectCornersEN) shp = rectCornersEN.slice();
+      if (shapeType === 'poly' && polyEN.length>=3) shp = polyEN.slice();
+
+      shp = removeNearDuplicates(shp, 0.001);
+
+      if (shp.length >= 3){
+        const closed = shp.concat([shp[0]]);
+        const simplified = rdpSimplify(closed, tol);
+        const finalPts = simplified.slice(0, -1);
+        const ptsXY = finalPts.map(outXY).filter(Boolean);
+        dxf += exportBoundaryAsLines(ptsXY, shpLayerName, DXF_COLOR_RED, true);
+        entities += ptsXY.length;
+      }
     }
 
     dxf += ["0","ENDSEC","0","EOF"].join(EOL) + EOL;
 
     clearStatusLinks();
+    statusBox.textContent = `Export ready. (${entities.toLocaleString()} entities)`;
 
-    if (entities > 60000) {
-      statusBox.textContent =
-        `Warning: exporting ~${entities.toLocaleString()} entities.\n` +
-        `If CAD hangs, increase spacing or increase simplify (m).`;
-    } else {
-      statusBox.textContent = `Building DXF… (${entities.toLocaleString()} entities)`;
-    }
-
-    const filename = `grid_${shapeType}_${rel ? "REL" : "OSGB"}_${spacing.toFixed(3)}m.dxf`;
+    const filename = `grid_${shapeType || "none"}_${rel ? "REL" : "OSGB"}_${spacing.toFixed(3)}m.dxf`;
     const blob = new Blob([dxf], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
 
@@ -898,39 +1053,45 @@
     a.style.display = "none";
     document.body.appendChild(a);
 
-    statusBox.textContent = `Export ready.`;
     statusBox.appendChild(document.createElement("br"));
     statusBox.appendChild(manual);
 
     try { a.click(); } catch (e) {}
     a.remove();
-
     setTimeout(() => URL.revokeObjectURL(url), 120000);
   }
 
   // ---------------------------
-  // UI / picking / undo
+  // UI / buttons / picking
   // ---------------------------
   function updateButtons(){
     const inRectPick = (mode === 'rect3');
     const inPolyPick = (mode === 'poly');
-    const canUndo = (inPolyPick && polyEN.length > 0) ||
-                    (inRectPick && (rP1 || rP2 || rP3)) ||
-                    (mode === 'pickAngle' && (a1 || a2));
+
+    const canUndo =
+      (inPolyPick && polyEN.length > 0) ||
+      (inRectPick && (rP1 || rP2 || rP3)) ||
+      (mode === 'pickAngle' && (a1 || a2)) ||
+      (mode === 'circle' && !!circleCenterEN);
+
     undoBtn.disabled = !canUndo;
 
     finishShapeBtn.disabled = !(shapeType === 'poly' && polyEN.length >= 3);
 
-    clearShapeBtn.disabled = !(shapeType && (
+    clearShapeBtn.disabled = !(
       (shapeType==='poly' && polyEN.length) ||
-      (shapeType==='rect' && (rP1||rP2||rP3||rectCornersEN))
-    ));
+      (shapeType==='rect' && (rP1||rP2||rP3||rectCornersEN)) ||
+      (shapeType==='circle' && circleCenterEN)
+    );
   }
 
   rect3Btn.addEventListener('click', () => {
     setMode('rect3');
     shapeType = 'rect';
+
     polyEN = [];
+    circleCenterEN=null; circleRadiusM=NaN; setCircleInfo('None');
+
     rP1=rP2=rP3=null;
     rectU=null; rectLen=0; rectWid=0; rectCornersEN=null;
     exportOriginEN = null;
@@ -944,6 +1105,9 @@
   polyBtn.addEventListener('click', () => {
     setMode('poly');
     shapeType = 'poly';
+
+    circleCenterEN=null; circleRadiusM=NaN; setCircleInfo('None');
+
     polyEN = [];
     rP1=rP2=rP3=null;
     rectU=null; rectCornersEN=null;
@@ -951,7 +1115,22 @@
 
     pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
     setShapeInfo('Polygon: click points…');
-    statusBox.textContent = 'Polygon mode: click points around boundary, then Finish shape.';
+    statusBox.textContent = 'Polygon mode: click points around boundary, then Finish polygon.';
+    updateButtons();
+  });
+
+  circleBtn.addEventListener('click', () => {
+    setMode('circle');
+    shapeType = 'circle';
+
+    // clear other shapes
+    polyEN = [];
+    rP1=rP2=rP3=null;
+    rectU=null; rectCornersEN=null;
+
+    pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
+    setShapeInfo('Circle: click centre');
+    statusBox.textContent = 'Circle mode: click centre point. Radius comes from the input (m).';
     updateButtons();
   });
 
@@ -970,6 +1149,9 @@
     polyEN = [];
     rP1=rP2=rP3=null;
     rectU=null; rectCornersEN=null;
+
+    circleCenterEN=null; circleRadiusM=NaN; setCircleInfo('None');
+
     a1=a2=null; pickedBasis=null;
     exportOriginEN = null;
 
@@ -1023,6 +1205,17 @@
       updateButtons();
       return;
     }
+
+    if (mode === 'circle' && shapeType === 'circle'){
+      circleCenterEN = null;
+      circleRadiusM = NaN;
+      setCircleInfo('None');
+      shapeLayer.clearLayers();
+      gridLayer.clearLayers();
+      statusBox.textContent = 'Undo: removed circle centre.';
+      updateButtons();
+      return;
+    }
   });
 
   pickAngleBtn.addEventListener('click', () => {
@@ -1036,6 +1229,23 @@
   map.on('click', (e) => {
     const ll = getPickLatLng(e.latlng);
     const en = latLngToEN(ll);
+
+    if (mode === 'circle' && shapeType === 'circle'){
+      const r = getCircleRadius();
+      if (!Number.isFinite(r) || r <= 0){
+        alert('Circle radius must be > 0 metres');
+        return;
+      }
+      circleCenterEN = en;
+      circleRadiusM = r;
+      setCircleInfo(`Centre set, R=${circleRadiusM.toFixed(3)} m`);
+      setMode('idle');
+      setShapeInfo(`Circle R=${circleRadiusM.toFixed(3)} m`);
+      statusBox.textContent = 'Circle set. Grid clipped inside.';
+      redrawAll();
+      updateButtons();
+      return;
+    }
 
     if (mode === 'pickAngle'){
       if (!a1){
@@ -1118,7 +1328,7 @@
   });
 
   // ---------------------------
-  // Buttons / GPS / toggles
+  // GPS / reset / export / toggles
   // ---------------------------
   document.getElementById('gpsBtn').addEventListener('click', () => {
     map.locate({ setView: true, maxZoom: 19, enableHighAccuracy: true, timeout: 15000 });
@@ -1141,6 +1351,7 @@
     polyEN = [];
     rP1=rP2=rP3=null;
     rectU=null; rectCornersEN=null;
+    circleCenterEN=null; circleRadiusM=NaN; setCircleInfo('None');
     a1=a2=null; pickedBasis=null;
     exportOriginEN = null;
 
@@ -1159,9 +1370,21 @@
 
   snap10El.addEventListener('change', () => { applySpacingUIState(); redrawAll(); });
   gridSpacingEl.addEventListener('input', redrawAll);
+  circleRadiusEl.addEventListener('input', () => {
+    if (shapeType === 'circle' && circleCenterEN){
+      const r = getCircleRadius();
+      if (Number.isFinite(r) && r > 0){
+        circleRadiusM = r;
+        setCircleInfo(`Centre set, R=${circleRadiusM.toFixed(3)} m`);
+        setShapeInfo(`Circle R=${circleRadiusM.toFixed(3)} m`);
+        redrawAll();
+      }
+    }
+  });
+
   document.querySelectorAll('input[name="gridOri"]').forEach(r => r.addEventListener('change', redrawAll));
 
-  // Make Leaflet happy after layout
+  // Leaflet resize safety
   window.addEventListener('resize', () => map.invalidateSize({ animate:false }));
   setTimeout(() => map.invalidateSize({ animate:false }), 50);
 
@@ -1170,7 +1393,7 @@
   updateButtons();
   applySpacingUIState();
   loadOSTN15();
-  statusBox.textContent = 'Ready. Choose Rectangle or Polygon.';
+  statusBox.textContent = 'Ready. Choose Rectangle / Polygon / Circle.';
 </script>
 </body>
 </html>
