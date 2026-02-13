@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>OSGB36(15) Grid → DXF (Desktop)</title>
 
   <!-- Leaflet -->
@@ -24,468 +24,276 @@
   <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
 
   <style>
-    * { box-sizing: border-box; }
-    html, body { 
-      height: 100%; 
-      margin: 0; 
-      background: #0b0f19;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      overflow: hidden;
+    :root{
+      --bg:#0b0f19;
+      --panel:rgba(255,255,255,0.96);
+      --panel2:#f3f4f6;
+      --ink:#111827;
+      --muted:#374151;
+      --radius:16px;
+      --gap:10px;
+      --shadow:0 12px 28px rgba(0,0,0,0.35);
+      --border:1px solid rgba(17,24,39,0.12);
+    }
+    html, body{ height:100%; margin:0; background:var(--bg); overflow:hidden; }
+    .app{ height:100%; display:grid; grid-template-columns:380px 1fr; }
+    .panel{
+      height:100%;
+      background:var(--panel);
+      box-shadow:var(--shadow);
+      z-index:10;
+      border-right:var(--border);
+      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      display:flex; flex-direction:column;
+      min-width:320px;
+    }
+    .panelHeader{
+      padding:14px 14px 10px 14px;
+      border-bottom:var(--border);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .title{ font-weight:950; font-size:16px; color:var(--ink); }
+    .badge{
+      font-size:12px;
+      background:#e5e7eb;
+      padding:4px 10px;
+      border-radius:999px;
+      white-space:nowrap;
+      color:var(--ink);
+      font-weight:900;
+    }
+    .panelBody{ padding:14px; overflow:auto; }
+    .row{ display:flex; gap:var(--gap); align-items:center; margin-top:10px; flex-wrap:wrap; }
+    .btn{
+      flex:1;
+      padding:12px 12px;
+      font-size:14px;
+      font-weight:950;
+      border:0;
+      border-radius:14px;
+      background:#111827;
+      color:#fff;
+      cursor:pointer;
+      user-select:none;
+    }
+    .btn.secondary{ background:#4b5563; }
+    .btn.danger{ background:#991b1b; }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; }
+
+    .toggle{
+      display:flex; align-items:center; justify-content:space-between;
+      background:var(--panel2);
+      border-radius:14px;
+      padding:10px;
+      margin-top:10px;
+      gap:12px;
+      border:var(--border);
+    }
+    .toggle span{ font-size:13px; color:var(--ink); font-weight:900; }
+    .toggle input{ transform:scale(1.2); }
+
+    .seg{
+      display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;
+      background:var(--panel2); border-radius:14px; padding:10px; border:var(--border);
+    }
+    .seg label{
+      display:flex; align-items:center; gap:6px;
+      font-size:13px; font-weight:950; color:var(--ink);
+      padding:6px 10px; border-radius:999px; background:#fff;
+      border:1px solid #d1d5db;
+      cursor:pointer;
+      user-select:none;
+    }
+    .seg input{ transform:scale(1.15); }
+
+    .grid2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .field{
+      background:var(--panel2);
+      border-radius:14px;
+      padding:10px;
+      border:var(--border);
+    }
+    .field label{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:6px;
+      font-weight:900;
+    }
+    .field input[type="number"], .field input[type="text"]{
+      width:100%;
+      font-size:15px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid #d1d5db;
+      outline:none;
+      box-sizing:border-box;
+      background:#fff;
+    }
+    .hint{
+      font-size:12px;
+      font-weight:950;
+      color:var(--ink);
+      opacity:0.9;
+      margin-top:6px;
     }
 
-    .container {
-      display: flex;
-      height: 100vh;
-      width: 100vw;
+    .status{
+      margin-top:10px;
+      font-size:12px;
+      color:var(--ink);
+      background:#eef2ff;
+      border:1px solid #c7d2fe;
+      padding:10px;
+      border-radius:14px;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+    }
+    .mini{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.35; }
+    .divider{ margin-top:12px; height:1px; background:rgba(17,24,39,0.12); }
+
+    .mapWrap{ position:relative; height:100%; min-width:0; }
+    #map{ height:100%; width:100%; }
+    .leaflet-top, .leaflet-bottom { z-index:10050 !important; }
+    .leaflet-control-zoom a{ width:40px; height:40px; line-height:40px; font-size:18px; }
+    .leaflet-control-geocoder{ max-width:360px; }
+
+    .crosshair{
+      position:absolute;
+      left:50%; top:50%;
+      width:36px; height:36px;
+      transform:translate(-50%,-50%);
+      z-index:6000;
+      pointer-events:none;
+      display:none;
+    }
+    .crosshair:before, .crosshair:after{
+      content:"";
+      position:absolute;
+      background:rgba(255,255,255,0.9);
+      box-shadow:0 1px 4px rgba(0,0,0,0.35);
+    }
+    .crosshair:before{ left:50%; top:0; width:2px; height:100%; transform:translateX(-50%); }
+    .crosshair:after{ top:50%; left:0; height:2px; width:100%; transform:translateY(-50%); }
+    .crosshair .dot{
+      position:absolute;
+      left:50%; top:50%;
+      width:10px; height:10px;
+      border-radius:999px;
+      transform:translate(-50%,-50%);
+      background:rgba(255,255,255,0.95);
+      box-shadow:0 2px 8px rgba(0,0,0,0.35);
     }
 
-    .sidebar {
-      width: 400px;
-      background: #ffffff;
-      border-right: 1px solid #d1d5db;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-
-    .sidebar-content {
-      padding: 20px;
-      flex: 1;
-    }
-
-    .map-container {
-      flex: 1;
-      position: relative;
-    }
-
-    #map { 
-      height: 100%; 
-      width: 100%; 
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 2px solid #e5e7eb;
-    }
-
-    .title { 
-      font-weight: 900; 
-      font-size: 20px;
-      color: #111827;
-    }
-
-    .badge { 
-      font-size: 12px; 
-      background: #e5e7eb; 
-      padding: 6px 12px; 
-      border-radius: 999px; 
-      white-space: nowrap;
-      font-weight: 700;
-    }
-
-    .section {
-      margin-bottom: 20px;
-    }
-
-    .section-title {
-      font-size: 13px;
-      font-weight: 800;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 10px;
-    }
-
-    .btn-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .btn-row.single {
-      grid-template-columns: 1fr;
-    }
-
-    .btn {
-      padding: 12px 16px;
-      font-size: 14px;
-      font-weight: 700;
-      border: 0;
-      border-radius: 8px;
-      background: #111827;
-      color: white;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .btn:hover:not(:disabled) {
-      background: #1f2937;
-      transform: translateY(-1px);
-    }
-
-    .btn.secondary { 
-      background: #6b7280;
-    }
-
-    .btn.secondary:hover:not(:disabled) {
-      background: #4b5563;
-    }
-
-    .btn.danger { 
-      background: #dc2626;
-    }
-
-    .btn.danger:hover:not(:disabled) {
-      background: #991b1b;
-    }
-
-    .btn:disabled { 
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    .toggle-group {
-      background: #f9fafb;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-
-    .toggle {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 0;
-    }
-
-    .toggle span { 
-      font-size: 14px; 
-      color: #111827; 
-      font-weight: 600;
-    }
-
-    .toggle input { 
-      transform: scale(1.2);
-      cursor: pointer;
-    }
-
-    .radio-group {
-      background: #f9fafb;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-
-    .radio-group label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #111827;
-      padding: 8px;
-      cursor: pointer;
-      border-radius: 6px;
-      transition: background 0.15s;
-    }
-
-    .radio-group label:hover {
-      background: #f3f4f6;
-    }
-
-    .radio-group input { 
-      transform: scale(1.15);
-      cursor: pointer;
-    }
-
-    .field-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-
-    .field {
-      background: #f9fafb;
-      border-radius: 8px;
-      padding: 12px;
-    }
-
-    .field label {
-      display: block;
-      font-size: 12px;
-      font-weight: 700;
-      color: #6b7280;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-
-    .field input[type="number"], 
-    .field input[type="text"] {
-      width: 100%;
-      font-size: 14px;
-      padding: 8px 10px;
-      border-radius: 6px;
-      border: 1px solid #d1d5db;
-      outline: none;
-      background: white;
-      font-weight: 600;
-    }
-
-    .field input:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-
-    .field-value {
-      font-size: 15px;
-      font-weight: 900;
-      color: #111827;
-      padding: 8px 10px;
-      background: white;
-      border-radius: 6px;
-      border: 1px solid #e5e7eb;
-    }
-
-    .hint {
-      font-size: 11px;
-      font-weight: 700;
-      color: #6b7280;
-      margin-top: 4px;
-    }
-
-    .status {
-      background: #eef2ff;
-      border: 1px solid #c7d2fe;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      color: #111827;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      margin-bottom: 12px;
-      line-height: 1.5;
-    }
-
-    .info-text {
-      font-size: 12px;
-      color: #6b7280;
-      line-height: 1.6;
-      padding: 12px;
-      background: #f9fafb;
-      border-radius: 8px;
-      border-left: 3px solid #3b82f6;
-    }
-
-    .crosshair {
-      position: fixed;
-      left: 50%;
-      top: 50%;
-      width: 36px;
-      height: 36px;
-      transform: translate(-50%, -50%);
-      z-index: 6000;
-      pointer-events: none;
-      display: none;
-    }
-
-    .crosshair:before, 
-    .crosshair:after {
-      content: "";
-      position: absolute;
-      background: rgba(255, 255, 255, 0.9);
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-    }
-
-    .crosshair:before { 
-      left: 50%; 
-      top: 0; 
-      width: 2px; 
-      height: 100%; 
-      transform: translateX(-50%); 
-    }
-
-    .crosshair:after { 
-      top: 50%; 
-      left: 0; 
-      height: 2px; 
-      width: 100%; 
-      transform: translateY(-50%); 
-    }
-
-    .crosshair .dot {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      transform: translate(-50%, -50%);
-      background: rgba(255, 255, 255, 0.95);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-    }
-
-    .leaflet-control-zoom a { 
-      width: 40px; 
-      height: 40px; 
-      line-height: 40px; 
-      font-size: 18px; 
-    }
-
-    /* Scrollbar styling */
-    .sidebar::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .sidebar::-webkit-scrollbar-track {
-      background: #f1f5f9;
-    }
-
-    .sidebar::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 4px;
-    }
-
-    .sidebar::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
+    @media (max-width:980px){
+      .app{ grid-template-columns:1fr; grid-template-rows:420px 1fr; }
+      .panel{ height:420px; border-right:none; border-bottom:var(--border); }
+      .mapWrap{ height:calc(100vh - 420px); }
+      .leaflet-control-geocoder{ max-width:70vw; }
     }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <!-- Sidebar -->
-    <div class="sidebar">
-      <div class="sidebar-content">
-        <div class="header">
-          <div class="title">OSGB36(15) Grid → DXF</div>
-          <div class="badge" id="modeBadge">idle</div>
+  <div class="app">
+    <aside class="panel">
+      <div class="panelHeader">
+        <div class="title">OSGB36(15) Grid → DXF</div>
+        <div class="badge" id="modeBadge">idle</div>
+      </div>
+
+      <div class="panelBody">
+        <div class="row">
+          <button class="btn" id="rect3Btn">Rectangle (3 pts)</button>
+          <button class="btn secondary" id="polyBtn">Polygon (click points)</button>
         </div>
 
-        <!-- Shape Tools -->
-        <div class="section">
-          <div class="section-title">Shape Tools</div>
-          <div class="btn-row">
-            <button class="btn" id="rect3Btn">Rectangle (3 pts)</button>
-            <button class="btn secondary" id="polyBtn">Polygon</button>
-          </div>
-          <div class="btn-row">
-            <button class="btn secondary" id="finishShapeBtn" disabled>Finish Shape</button>
-            <button class="btn secondary" id="undoBtn" disabled>Undo</button>
-          </div>
-          <div class="btn-row single">
-            <button class="btn danger" id="clearShapeBtn" disabled>Clear Shape</button>
-          </div>
+        <div class="row">
+          <button class="btn secondary" id="finishShapeBtn" disabled>Finish shape</button>
+          <button class="btn secondary" id="undoBtn" disabled>Undo</button>
+          <button class="btn danger" id="clearShapeBtn" disabled>Clear shape</button>
         </div>
 
-        <!-- Utility Tools -->
-        <div class="section">
-          <div class="section-title">Utility</div>
-          <div class="btn-row">
-            <button class="btn secondary" id="pickAngleBtn">Pick Grid Angle</button>
-            <button class="btn secondary" id="gpsBtn">GPS Location</button>
-          </div>
-          <div class="btn-row">
-            <button class="btn secondary" id="resetBtn">Reset All</button>
-            <button class="btn" id="exportBtn" disabled>Export DXF</button>
-          </div>
+        <div class="row">
+          <button class="btn secondary" id="pickAngleBtn">Pick grid angle (2 pts)</button>
+          <button class="btn secondary" id="gpsBtn">GPS</button>
+          <button class="btn secondary" id="resetBtn">Reset</button>
+          <button class="btn" id="exportBtn" disabled>Export DXF</button>
         </div>
 
-        <!-- Options -->
-        <div class="section">
-          <div class="section-title">Options</div>
-          <div class="toggle-group">
-            <div class="toggle">
-              <span>Use crosshair</span>
-              <input id="useCrosshair" type="checkbox" />
-            </div>
-            <div class="toggle">
-              <span>Export relative to origin</span>
-              <input id="relativeExport" type="checkbox" />
-            </div>
-            <div class="toggle">
-              <span>Snap spacing to 10.000m</span>
-              <input id="snap10" type="checkbox" checked />
-            </div>
-          </div>
+        <div class="toggle">
+          <span>Use crosshair (pick at map centre)</span>
+          <input id="useCrosshair" type="checkbox" />
         </div>
 
-        <!-- Grid Orientation -->
-        <div class="section">
-          <div class="section-title">Grid Orientation</div>
-          <div class="radio-group">
-            <label><input type="radio" name="gridOri" value="shape" checked> Shape baseline</label>
-            <label><input type="radio" name="gridOri" value="north"> True North (page up)</label>
-            <label><input type="radio" name="gridOri" value="picked"> Picked angle</label>
-          </div>
+        <div class="toggle">
+          <span>Export relative to origin</span>
+          <input id="relativeExport" type="checkbox" />
         </div>
 
-        <!-- Parameters -->
-        <div class="section">
-          <div class="section-title">Parameters</div>
-          <div class="field-grid">
-            <div class="field">
-              <label for="gridSpacing">Grid spacing (m)</label>
-              <input id="gridSpacing" type="number" min="0.1" step="0.1" value="10" />
-              <div class="hint" id="spacingHint">Locked to 10.000m (snap ON)</div>
-            </div>
-            <div class="field">
-              <label for="gridLayer">Grid layer (DXF)</label>
-              <input id="gridLayer" type="text" value="GRID" />
-            </div>
-            <div class="field">
-              <label for="shapeLayer">Shape layer (DXF)</label>
-              <input id="shapeLayer" type="text" value="BOUNDARY" />
-            </div>
-            <div class="field">
-              <label for="simplifyTol">Boundary simplify (m)</label>
-              <input id="simplifyTol" type="number" min="0" step="0.1" value="0.5" />
-            </div>
+        <div class="toggle">
+          <span>Snap spacing to 10.000m</span>
+          <input id="snap10" type="checkbox" checked />
+        </div>
+
+        <div class="seg" aria-label="Grid orientation">
+          <label><input type="radio" name="gridOri" value="shape" checked> Shape baseline</label>
+          <label><input type="radio" name="gridOri" value="north"> True North (ortho)</label>
+          <label><input type="radio" name="gridOri" value="picked"> Picked angle</label>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="gridSpacing">Grid spacing (m)</label>
+            <input id="gridSpacing" type="number" min="0.1" step="0.1" value="10" />
+            <div class="hint" id="spacingHint">Locked to 10.000m (snap ON)</div>
+          </div>
+          <div class="field">
+            <label for="gridLayer">Grid layer (DXF)</label>
+            <input id="gridLayer" type="text" value="GRID" />
+          </div>
+          <div class="field">
+            <label for="shapeLayer">Shape layer (DXF)</label>
+            <input id="shapeLayer" type="text" value="BOUNDARY" />
+          </div>
+          <div class="field">
+            <label for="simplifyTol">Boundary simplify (m)</label>
+            <input id="simplifyTol" type="number" min="0" step="0.1" value="0.5" />
+          </div>
+          <div class="field">
+            <label>Shape</label>
+            <div style="font-size:14px;font-weight:950;color:#111827;" id="shapeInfo">None</div>
+          </div>
+          <div class="field">
+            <label>Grid angle (deg)</label>
+            <div style="font-size:14px;font-weight:950;color:#111827;" id="gridAngDeg">0.000</div>
           </div>
         </div>
 
-        <!-- Info Display -->
-        <div class="section">
-          <div class="section-title">Current State</div>
-          <div class="field-grid">
-            <div class="field">
-              <label>Shape</label>
-              <div class="field-value" id="shapeInfo">None</div>
-            </div>
-            <div class="field">
-              <label>Grid angle (deg)</label>
-              <div class="field-value" id="gridAngDeg">0.000</div>
-            </div>
-          </div>
+        <div class="status" id="statusBox">Starting…</div>
+
+        <div class="mini">
+          Rectangle: P1, P2 (baseline), P3 (width). Polygon: click points then Finish.
+          “True North (ortho)” exports perfectly square in CAD. Export: Grid BLUE, Shape RED.
         </div>
 
-        <!-- Status -->
-        <div class="section">
-          <div class="section-title">Status</div>
-          <div class="status" id="statusBox">Starting…</div>
-        </div>
+        <div class="divider"></div>
 
-        <!-- Help Text -->
-        <div class="info-text">
-          <strong>Rectangle:</strong> P1, P2 (baseline), P3 (width)<br>
-          <strong>Polygon:</strong> Tap points then Finish<br>
-          <strong>Export:</strong> Grid BLUE, Shape RED
+        <div class="mini">
+          Tip: Toggle crosshair ON to pan/zoom precisely, then click to place points at the map centre.
         </div>
       </div>
-    </div>
+    </aside>
 
-    <!-- Map Container -->
-    <div class="map-container">
+    <main class="mapWrap">
       <div id="map"></div>
       <div class="crosshair" id="crosshair"><div class="dot"></div></div>
-    </div>
+    </main>
   </div>
 
 <script>
@@ -531,9 +339,6 @@
 
   function getGridOriMode(){
     return document.querySelector('input[name="gridOri"]:checked')?.value || 'shape';
-  }
-  function updateGridAngleDisplay(){
-    gridAngDegEl.textContent = (gridAngleRad*180/Math.PI).toFixed(3);
   }
 
   // ---------------------------
@@ -596,7 +401,7 @@
   // Helpers / vector ops
   // ---------------------------
   function crosshairLatLng() { return map.getCenter(); }
-  function getPickLatLng(tapLatLng) { return useCrosshairEl.checked ? crosshairLatLng() : tapLatLng; }
+  function getPickLatLng(clickLatLng) { return useCrosshairEl.checked ? crosshairLatLng() : clickLatLng; }
 
   function latLngToEN(latlng) {
     const out = proj4('EPSG:4326', 'EPSG:27700', [latlng.lng, latlng.lat]);
@@ -617,21 +422,17 @@
     if (L < 1e-12) return null;
     return {e: v.e/L, n: v.n/L};
   }
-  function perpLeft(u){ return {e:-u.n, n:u.e}; }
 
-  // True north "north of the page" (map is north-up)
-  function pageNorthBasisAtLatLng(latlng){
-    const dLat = 0.0002;
-    const p0 = latLngToEN(latlng);
-    const pN = latLngToEN(L.latLng(latlng.lat + dLat, latlng.lng));
-    const v = sub(pN, p0);
-    const gy = unit(v);
-    if (!gy) return null;
-    const gx = {e: gy.n, n: -gy.e}; // perpendicular right
-    return {gx, gy};
+  // ✅ ORTHO TRUE NORTH (CAD-perfect)
+  function pageNorthBasisAtLatLng(_latlng){
+    return { gx: {e: 1, n: 0}, gy: {e: 0, n: 1} };
   }
+
   function basisFromBaselineU(u){
-    return { gx: u, gy: perpLeft(u) };
+    const gx = unit(u);
+    if (!gx) return null;
+    const gy = { e: -gx.n, n: gx.e }; // exact perpendicular
+    return { gx, gy };
   }
 
   // ---------------------------
@@ -649,7 +450,7 @@
     mode = m;
     modeBadge.textContent =
       m === 'rect3' ? 'rect: pick P1' :
-      m === 'poly' ? 'poly: tap points' :
+      m === 'poly' ? 'poly: click points' :
       m === 'pickAngle' ? 'pick angle' :
       'idle';
   }
@@ -669,8 +470,12 @@
   let exportOriginEN = null;
 
   function setShapeInfo(text){ shapeInfoEl.textContent = text; }
+  function updateGridAngleDisplay(){
+    gridAngDegEl.textContent = (gridAngleRad*180/Math.PI).toFixed(3);
+  }
+
   function drawPickPoint(latlng, label) {
-    const m = L.circleMarker(latlng, { radius: 8, weight: 2, opacity: 0.95, fillOpacity: 0.25 }).addTo(pickLayer);
+    const m = L.circleMarker(latlng, { radius: 6, weight: 2, opacity: 0.95, fillOpacity: 0.25 }).addTo(pickLayer);
     m.bindTooltip(label, { permanent: true, direction: 'top', offset: [0,-8] });
   }
 
@@ -679,11 +484,15 @@
     const L = hypot2(v.e,v.n);
     if (L < 0.001) return null;
     const u = unit(v);
-    const w0 = perpLeft(u);
+
+    // perpendicular left
+    const w0 = { e: -u.n, n: u.e };
+
     const widthSigned = dot(sub(p3,p1), w0);
     const W = Math.abs(widthSigned);
     if (W < 0.001) return null;
-    const w = widthSigned >= 0 ? w0 : mul(w0,-1);
+
+    const w = widthSigned >= 0 ? w0 : mul(w0, -1);
 
     const c1 = p1;
     const c2 = p2;
@@ -944,7 +753,6 @@
   function exportBoundaryAsLines(pointsXY, layer, aciColor, closed=true) {
     let out = "";
     if (!pointsXY || pointsXY.length < 2) return out;
-
     for (let i = 0; i < pointsXY.length - 1; i++) {
       const a = pointsXY[i], b = pointsXY[i+1];
       out += dxfLineEntity(a.x, a.y, b.x, b.y, layer, aciColor);
@@ -993,7 +801,6 @@
     const minN = b.minN - pad, maxN = b.maxN + pad;
 
     const gx = gridBasis.gx, gy = gridBasis.gy;
-
     function toGrid(p){ return {x: dot(p,gx), y: dot(p,gy)}; }
     function fromGrid(x,y){ return add(mul(gx,x), mul(gy,y)); }
 
@@ -1071,18 +878,17 @@
     }
 
     const filename = `grid_${shapeType}_${rel ? "REL" : "OSGB"}_${spacing.toFixed(3)}m.dxf`;
-
     const blob = new Blob([dxf], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
 
     const manual = document.createElement("a");
     manual.href = url;
     manual.download = filename;
-    manual.textContent = `Click here to download: ${filename}`;
+    manual.textContent = `Click here if download didn’t start: ${filename}`;
     manual.dataset.manualDownload = "1";
     manual.style.display = "block";
     manual.style.marginTop = "10px";
-    manual.style.fontWeight = "900";
+    manual.style.fontWeight = "950";
     manual.style.color = "#111827";
     manual.style.textDecoration = "underline";
 
@@ -1131,7 +937,7 @@
 
     pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
     setShapeInfo('Rectangle: pick P1');
-    statusBox.textContent = 'Rectangle mode: pick P1, then P2, then P3.';
+    statusBox.textContent = 'Rectangle mode: click P1, then P2, then P3.';
     updateButtons();
   });
 
@@ -1144,8 +950,8 @@
     exportOriginEN = null;
 
     pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
-    setShapeInfo('Polygon: tap points…');
-    statusBox.textContent = 'Polygon mode: tap points around boundary, then Finish shape.';
+    setShapeInfo('Polygon: click points…');
+    statusBox.textContent = 'Polygon mode: click points around boundary, then Finish shape.';
     updateButtons();
   });
 
@@ -1312,11 +1118,12 @@
   });
 
   // ---------------------------
-  // GPS / toggles
+  // Buttons / GPS / toggles
   // ---------------------------
   document.getElementById('gpsBtn').addEventListener('click', () => {
     map.locate({ setView: true, maxZoom: 19, enableHighAccuracy: true, timeout: 15000 });
   });
+
   map.on('locationfound', (e) => {
     if (window._gpsAccuracy) window._gpsAccuracy.remove();
     window._gpsAccuracy = L.circle(e.latlng, {
@@ -1324,6 +1131,7 @@
     }).addTo(map);
     statusBox.textContent = `GPS found (±${Math.round(e.accuracy)}m).`;
   });
+
   map.on('locationerror', (e) => {
     alert("Couldn't get GPS location: " + (e.message || "permission denied / unavailable"));
   });
@@ -1352,6 +1160,10 @@
   snap10El.addEventListener('change', () => { applySpacingUIState(); redrawAll(); });
   gridSpacingEl.addEventListener('input', redrawAll);
   document.querySelectorAll('input[name="gridOri"]').forEach(r => r.addEventListener('change', redrawAll));
+
+  // Make Leaflet happy after layout
+  window.addEventListener('resize', () => map.invalidateSize({ animate:false }));
+  setTimeout(() => map.invalidateSize({ animate:false }), 50);
 
   // Startup
   setMode('idle');
