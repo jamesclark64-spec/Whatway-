@@ -1,1399 +1,1312 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>OSGB36(15) Grid → DXF (Desktop)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SurveyLens</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0d0f12;
+    --surface:  #141619;
+    --card:     #1c1f26;
+    --border:   #272b38;
+    --amber:    #e8a020;
+    --amber-lo: #8a5e10;
+    --amber-hi: #ffc850;
+    --amber-glow: #e8a02030;
+    --green:    #3ecf6e;
+    --green-glow:#3ecf6e25;
+    --red:      #e05252;
+    --text:     #d6dae8;
+    --muted:    #5a6180;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Barlow Condensed', sans-serif;
+    --radius:   4px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
 
-  <!-- Leaflet -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-          crossorigin=""></script>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-  <!-- Geocoder -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
-  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    overscroll-behavior: none;
+  }
 
-  <!-- Proj4 + GeoTIFF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.19.0/proj4.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+  /* ── APP SHELL ── */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+  }
 
-  <style>
-    :root{
-      --bg:#0b0f19;
-      --panel:rgba(255,255,255,0.96);
-      --panel2:#f3f4f6;
-      --ink:#111827;
-      --muted:#374151;
-      --radius:16px;
-      --gap:10px;
-      --shadow:0 12px 28px rgba(0,0,0,0.35);
-      --border:1px solid rgba(17,24,39,0.12);
-    }
-    html, body{ height:100%; margin:0; background:var(--bg); overflow:hidden; }
-    .app{ height:100%; display:grid; grid-template-columns:380px 1fr; }
-    .panel{
-      height:100%;
-      background:var(--panel);
-      box-shadow:var(--shadow);
-      z-index:10;
-      border-right:var(--border);
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      display:flex; flex-direction:column;
-      min-width:320px;
-    }
-    .panelHeader{
-      padding:14px 14px 10px 14px;
-      border-bottom:var(--border);
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-    }
-    .title{ font-weight:950; font-size:16px; color:var(--ink); }
-    .badge{
-      font-size:12px;
-      background:#e5e7eb;
-      padding:4px 10px;
-      border-radius:999px;
-      white-space:nowrap;
-      color:var(--ink);
-      font-weight:900;
-    }
-    .panelBody{ padding:14px; overflow:auto; }
-    .row{ display:flex; gap:var(--gap); align-items:center; margin-top:10px; flex-wrap:wrap; }
-    .btn{
-      flex:1;
-      padding:12px 12px;
-      font-size:14px;
-      font-weight:950;
-      border:0;
-      border-radius:14px;
-      background:#111827;
-      color:#fff;
-      cursor:pointer;
-      user-select:none;
-    }
-    .btn.secondary{ background:#4b5563; }
-    .btn.danger{ background:#991b1b; }
-    .btn:disabled{ opacity:0.55; cursor:not-allowed; }
+  /* ── HEADER ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: calc(var(--safe-top) + 12px) 20px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  .header-logo {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--amber);
+    letter-spacing: 0.1em;
+    flex: 1;
+  }
+  .header-logo span { color: var(--muted); }
+  .step-indicator {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+  .step-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+  }
+  .step-dot.active {
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+    width: 18px;
+    border-radius: 3px;
+  }
+  .step-dot.done { background: var(--green); }
 
-    .toggle{
-      display:flex; align-items:center; justify-content:space-between;
-      background:var(--panel2);
-      border-radius:14px;
-      padding:10px;
-      margin-top:10px;
-      gap:12px;
-      border:var(--border);
-    }
-    .toggle span{ font-size:13px; color:var(--ink); font-weight:900; }
-    .toggle input{ transform:scale(1.2); }
+  /* ── SCROLLABLE CONTENT ── */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
 
-    .seg{
-      display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;
-      background:var(--panel2); border-radius:14px; padding:10px; border:var(--border);
-    }
-    .seg label{
-      display:flex; align-items:center; gap:6px;
-      font-size:13px; font-weight:950; color:var(--ink);
-      padding:6px 10px; border-radius:999px; background:#fff;
-      border:1px solid #d1d5db;
-      cursor:pointer;
-      user-select:none;
-    }
-    .seg input{ transform:scale(1.15); }
+  /* ── SCREENS ── */
+  .screen {
+    display: none;
+    flex-direction: column;
+    min-height: 100%;
+    padding: 20px 20px calc(20px + var(--safe-bot));
+    gap: 16px;
+  }
+  .screen.active { display: flex; }
 
-    .grid2{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-      margin-top:10px;
-    }
-    .field{
-      background:var(--panel2);
-      border-radius:14px;
-      padding:10px;
-      border:var(--border);
-    }
-    .field label{
-      display:block;
-      font-size:12px;
-      color:var(--muted);
-      margin-bottom:6px;
-      font-weight:900;
-    }
-    .field input[type="number"], .field input[type="text"]{
-      width:100%;
-      font-size:15px;
-      padding:10px;
-      border-radius:12px;
-      border:1px solid #d1d5db;
-      outline:none;
-      box-sizing:border-box;
-      background:#fff;
-    }
-    .hint{
-      font-size:12px;
-      font-weight:950;
-      color:var(--ink);
-      opacity:0.9;
-      margin-top:6px;
-    }
+  /* ── SECTION LABEL ── */
+  .sec-label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
 
-    .status{
-      margin-top:10px;
-      font-size:12px;
-      color:var(--ink);
-      background:#eef2ff;
-      border:1px solid #c7d2fe;
-      padding:10px;
-      border-radius:14px;
-      white-space:pre-wrap;
-      overflow-wrap:anywhere;
-    }
-    .mini{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.35; }
-    .divider{ margin-top:12px; height:1px; background:rgba(17,24,39,0.12); }
+  /* ── STEP HEADING ── */
+  .step-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+  .step-heading h1 {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    color: var(--text);
+  }
+  .step-heading h1 em {
+    font-style: normal;
+    color: var(--amber);
+  }
+  .step-heading p {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.6;
+    letter-spacing: 0.03em;
+  }
 
-    .mapWrap{ position:relative; height:100%; min-width:0; }
-    #map{ height:100%; width:100%; }
-    .leaflet-top, .leaflet-bottom { z-index:10050 !important; }
-    .leaflet-control-zoom a{ width:40px; height:40px; line-height:40px; font-size:18px; }
-    .leaflet-control-geocoder{ max-width:360px; }
+  /* ── API KEY STRIP ── */
+  .api-strip {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .api-strip .sec-label { margin-bottom: 0; }
+  .api-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .api-strip input {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 10px 12px;
+    outline: none;
+    min-width: 0;
+    caret-color: var(--amber);
+    -webkit-appearance: none;
+  }
+  .api-strip input:focus { border-color: var(--amber); }
+  .api-status {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .api-status.ok { color: var(--green); }
 
-    .crosshair{
-      position:absolute;
-      left:50%; top:50%;
-      width:36px; height:36px;
-      transform:translate(-50%,-50%);
-      z-index:6000;
-      pointer-events:none;
-      display:none;
-    }
-    .crosshair:before, .crosshair:after{
-      content:"";
-      position:absolute;
-      background:rgba(255,255,255,0.9);
-      box-shadow:0 1px 4px rgba(0,0,0,0.35);
-    }
-    .crosshair:before{ left:50%; top:0; width:2px; height:100%; transform:translateX(-50%); }
-    .crosshair:after{ top:50%; left:0; height:2px; width:100%; transform:translateY(-50%); }
-    .crosshair .dot{
-      position:absolute;
-      left:50%; top:50%;
-      width:10px; height:10px;
-      border-radius:999px;
-      transform:translate(-50%,-50%);
-      background:rgba(255,255,255,0.95);
-      box-shadow:0 2px 8px rgba(0,0,0,0.35);
-    }
+  /* ── CAPTURE ZONE (hero) ── */
+  .capture-zone {
+    position: relative;
+    background: var(--card);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.2s;
+    aspect-ratio: 4/3;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .capture-zone.has-image {
+    border-style: solid;
+    border-color: var(--amber);
+    aspect-ratio: auto;
+  }
+  .capture-zone.dragging { border-color: var(--amber); background: var(--amber-glow); }
 
-    @media (max-width:980px){
-      .app{ grid-template-columns:1fr; grid-template-rows:420px 1fr; }
-      .panel{ height:420px; border-right:none; border-bottom:var(--border); }
-      .mapWrap{ height:calc(100vh - 420px); }
-      .leaflet-control-geocoder{ max-width:70vw; }
-    }
-  </style>
+  .capture-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: var(--amber-glow);
+    border: 2px solid var(--amber-lo);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+  .capture-label {
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .capture-hint {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.7;
+  }
+
+  #imgPreview {
+    width: 100%;
+    display: block;
+    max-height: 55vh;
+    object-fit: contain;
+    background: var(--bg);
+  }
+  .img-overlay-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: #00000088;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    padding: 5px 10px;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+
+  /* ── CAPTURE BUTTONS ── */
+  .capture-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    -webkit-appearance: none;
+    min-height: 52px;
+  }
+  .btn:active { opacity: 0.7; transform: scale(0.98); }
+  .btn.primary {
+    background: var(--amber);
+    color: #0d0f12;
+    border-color: var(--amber);
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+  }
+  .btn.primary:active { background: var(--amber-hi); }
+  .btn.primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn.success {
+    background: var(--green);
+    color: #0d0f12;
+    border-color: var(--green);
+  }
+  .btn.ghost {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .btn.full { width: 100%; }
+  .btn.icon-btn {
+    padding: 14px;
+    aspect-ratio: 1;
+    font-size: 1.2rem;
+  }
+
+  /* ── HINT CONFIG ── */
+  .config-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .config-card label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    display: block;
+  }
+  .config-card input, .config-card select {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 11px 12px;
+    outline: none;
+    caret-color: var(--amber);
+    -webkit-appearance: none;
+  }
+  .config-card input:focus, .config-card select:focus { border-color: var(--amber); }
+
+  /* ── PRESET CHIPS ── */
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 100px;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .chip.active {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: var(--amber-glow);
+  }
+
+  /* ── PROCESSING SCREEN ── */
+  .processing-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    text-align: center;
+  }
+  .spinner {
+    width: 52px; height: 52px;
+    border: 3px solid var(--border);
+    border-top-color: var(--amber);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .proc-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--amber);
+  }
+  .proc-sub {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .proc-thumb {
+    width: 100%;
+    max-height: 140px;
+    object-fit: cover;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    opacity: 0.6;
+  }
+
+  /* ── RESULTS SCREEN ── */
+  .result-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stat-pill {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 10px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat-pill .val {
+    font-family: var(--mono);
+    font-size: 1.3rem;
+    color: var(--amber);
+    font-weight: 700;
+  }
+  .stat-pill .lbl {
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .csv-preview-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .csv-preview-head {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .csv-preview-head span {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .csv-edit-btn {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--amber);
+    background: none;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    padding: 2px 6px;
+  }
+
+  .csv-table-wrap {
+    overflow-x: auto;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  table.csv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    min-width: 300px;
+  }
+  table.csv-table th {
+    background: var(--surface);
+    color: var(--amber);
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--amber-lo);
+    position: sticky;
+    top: 0;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    font-size: 0.65rem;
+  }
+  table.csv-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  table.csv-table tr:last-child td { border-bottom: none; }
+  table.csv-table tr:nth-child(even) td { background: #ffffff04; }
+
+  .raw-csv {
+    width: 100%;
+    min-height: 120px;
+    max-height: 200px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: #a0e8b0;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    padding: 12px;
+    resize: vertical;
+    outline: none;
+    line-height: 1.7;
+    caret-color: var(--green);
+    -webkit-appearance: none;
+  }
+  .raw-csv:focus { border-color: var(--green); }
+
+  .action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  /* ── ERROR CARD ── */
+  .error-card {
+    background: #e0525215;
+    border: 1px solid #e0525240;
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .error-card .error-title {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--red);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .error-card .error-msg {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* ── SUFFIX APPENDER TOOL ── */
+  .tool-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .tool-section-head {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tool-section-head:active { background: #ffffff05; }
+  .tool-num {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+  }
+  .tool-name {
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .tool-chevron {
+    color: var(--muted);
+    font-size: 0.75rem;
+    transition: transform 0.2s;
+  }
+  .tool-section.open .tool-chevron { transform: rotate(90deg); }
+  .tool-body-inner {
+    display: none;
+    padding: 0 16px 16px;
+    flex-direction: column;
+    gap: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .tool-section.open .tool-body-inner { display: flex; }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 8px 20px calc(8px + var(--safe-bot));
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: calc(80px + var(--safe-bot));
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--green);
+    color: #0d0f12;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    padding: 10px 20px;
+    border-radius: 100px;
+    letter-spacing: 0.08em;
+    opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--red); }
+
+  /* ── RETRY BADGE ── */
+  .retry-badge {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--amber);
+    background: var(--amber-glow);
+    border: 1px solid var(--amber-lo);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    text-align: center;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── PULSE ANIMATION ── */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulsing { animation: pulse 1.4s ease-in-out infinite; }
+
+  /* ── SLIDE TRANSITIONS ── */
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .screen.active { animation: slideIn 0.22s ease; }
+</style>
 </head>
-
 <body>
-  <div class="app">
-    <aside class="panel">
-      <div class="panelHeader">
-        <div class="title">OSGB36(15) Grid → DXF</div>
-        <div class="badge" id="modeBadge">idle</div>
-      </div>
 
-      <div class="panelBody">
-        <div class="row">
-          <button class="btn" id="rect3Btn">Rectangle (3 pts)</button>
-          <button class="btn secondary" id="polyBtn">Polygon</button>
-          <button class="btn secondary" id="circleBtn">Circle (centre + radius)</button>
-        </div>
+<div class="app">
 
-        <div class="row">
-          <button class="btn secondary" id="finishShapeBtn" disabled>Finish polygon</button>
-          <button class="btn secondary" id="undoBtn" disabled>Undo</button>
-          <button class="btn danger" id="clearShapeBtn" disabled>Clear</button>
-        </div>
-
-        <div class="row">
-          <button class="btn secondary" id="pickAngleBtn">Pick grid angle (2 pts)</button>
-          <button class="btn secondary" id="gpsBtn">GPS</button>
-          <button class="btn secondary" id="resetBtn">Reset</button>
-          <button class="btn" id="exportBtn" disabled>Export DXF</button>
-        </div>
-
-        <div class="toggle">
-          <span>Use crosshair (pick at map centre)</span>
-          <input id="useCrosshair" type="checkbox" />
-        </div>
-
-        <div class="toggle">
-          <span>Export relative to origin</span>
-          <input id="relativeExport" type="checkbox" />
-        </div>
-
-        <div class="toggle">
-          <span>Snap spacing to 10.000m</span>
-          <input id="snap10" type="checkbox" checked />
-        </div>
-
-        <div class="seg" aria-label="Grid orientation">
-          <label><input type="radio" name="gridOri" value="shape" checked> Shape baseline</label>
-          <label><input type="radio" name="gridOri" value="north"> True North (ortho)</label>
-          <label><input type="radio" name="gridOri" value="picked"> Picked angle</label>
-        </div>
-
-        <div class="grid2">
-          <div class="field">
-            <label for="gridSpacing">Grid spacing (m)</label>
-            <input id="gridSpacing" type="number" min="0.1" step="0.1" value="10" />
-            <div class="hint" id="spacingHint">Locked to 10.000m (snap ON)</div>
-          </div>
-
-          <div class="field">
-            <label for="circleRadius">Circle radius (m)</label>
-            <input id="circleRadius" type="number" min="0.001" step="0.1" value="5" />
-            <div class="hint">Used when placing a circle boundary</div>
-          </div>
-
-          <div class="field">
-            <label for="gridLayer">Grid layer (DXF)</label>
-            <input id="gridLayer" type="text" value="GRID" />
-          </div>
-          <div class="field">
-            <label for="shapeLayer">Boundary layer (DXF)</label>
-            <input id="shapeLayer" type="text" value="BOUNDARY" />
-          </div>
-
-          <div class="field">
-            <label for="simplifyTol">Boundary simplify (m)</label>
-            <input id="simplifyTol" type="number" min="0" step="0.1" value="0.5" />
-          </div>
-
-          <div class="field">
-            <label>Shape</label>
-            <div style="font-size:14px;font-weight:950;color:#111827;" id="shapeInfo">None</div>
-          </div>
-
-          <div class="field">
-            <label>Grid angle (deg)</label>
-            <div style="font-size:14px;font-weight:950;color:#111827;" id="gridAngDeg">0.000</div>
-          </div>
-
-          <div class="field">
-            <label>Circle</label>
-            <div style="font-size:14px;font-weight:950;color:#111827;" id="circleInfo">None</div>
-          </div>
-        </div>
-
-        <div class="status" id="statusBox">Starting…</div>
-
-        <div class="mini">
-          Rectangle/Polygon/Circle are all boundary options.
-          Grid preview + export are clipped inside the current boundary.
-          Circle boundary exports as a DXF CIRCLE on the BOUNDARY layer.
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="mini">
-          Tip: Crosshair ON lets you pan/zoom then click to place picks at map centre.
-        </div>
-      </div>
-    </aside>
-
-    <main class="mapWrap">
-      <div id="map"></div>
-      <div class="crosshair" id="crosshair"><div class="dot"></div></div>
-    </main>
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logo">SURVEY<span>LENS</span></div>
+    <div class="step-indicator">
+      <div class="step-dot active" id="dot0"></div>
+      <div class="step-dot" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+    </div>
   </div>
 
+  <!-- CONTENT -->
+  <div class="content" id="mainContent">
+
+    <!-- ══ SCREEN 0: CAPTURE ══ -->
+    <div class="screen active" id="screen0">
+
+      <div class="step-heading">
+        <div class="sec-label">Step 01 / Capture</div>
+        <h1>IMAGE <em>→ CSV</em></h1>
+        <p>Photograph a field book, printout, or<br>any tabular survey data to extract it.</p>
+      </div>
+
+      <!-- API KEY -->
+      <div class="api-strip">
+        <div class="sec-label">Anthropic API Key</div>
+        <div class="api-row">
+          <input type="password" id="apiKey" placeholder="sk-ant-api03-…"
+            oninput="saveKey()" autocomplete="off" inputmode="text">
+          <button class="btn ghost" onclick="toggleKey()" id="keyBtn"
+            style="padding:12px 14px; min-height:44px; font-size:0.7rem;">SHOW</button>
+        </div>
+        <div class="api-status" id="apiStatus">Key saved in device storage only · <a href="https://console.anthropic.com" target="_blank" style="color:var(--amber); text-decoration:none;">console.anthropic.com</a></div>
+      </div>
+
+      <!-- CAPTURE ZONE -->
+      <div id="captureZone" class="capture-zone"
+        onclick="triggerUpload()"
+        ondragover="onDragOver(event)"
+        ondragleave="onDragLeave(event)"
+        ondrop="onDrop(event)">
+
+        <div id="capturePrompt">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:12px;">
+            <div class="capture-icon">📷</div>
+            <div class="capture-label">Tap to Open</div>
+            <div class="capture-hint">Camera · Photo Library · Files<br>or drag & drop an image here</div>
+          </div>
+        </div>
+
+        <img id="imgPreview" style="display:none;">
+
+        <button id="clearImgBtn" class="img-overlay-btn" onclick="clearImage(event)"
+          style="display:none;">✕ CLEAR</button>
+
+        <!-- hidden file inputs -->
+        <input type="file" id="fileCamera"   accept="image/*" capture="environment" style="display:none;" onchange="onFileSelect(event)">
+        <input type="file" id="fileGallery"  accept="image/*" style="display:none;" onchange="onFileSelect(event)">
+      </div>
+
+      <!-- CAPTURE BUTTONS -->
+      <div class="capture-btns">
+        <button class="btn" onclick="document.getElementById('fileCamera').click()">
+          📷 Camera
+        </button>
+        <button class="btn" onclick="document.getElementById('fileGallery').click()">
+          🖼 Gallery
+        </button>
+      </div>
+
+      <!-- COLUMN HINT -->
+      <div class="config-card">
+        <div>
+          <label>Column Header Hint</label>
+          <input type="text" id="headerHint" value="ID,Easting,Northing,Elevation"
+            placeholder="e.g. ID,Easting,Northing,Elevation">
+        </div>
+        <div>
+          <label>Presets</label>
+          <div class="chip-row" id="hintChips">
+            <div class="chip active" onclick="setHint(this,'ID,Easting,Northing,Elevation')">ENZ</div>
+            <div class="chip" onclick="setHint(this,'ID,Northing,Easting,Elevation')">NEZ</div>
+            <div class="chip" onclick="setHint(this,'ID,Easting,Northing')">EN only</div>
+            <div class="chip" onclick="setHint(this,'Point,X,Y,Z,Code')">Point+Code</div>
+            <div class="chip" onclick="setHint(this,'')">Auto-detect</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXTRACT BUTTON -->
+      <button class="btn primary full" id="extractBtn" onclick="startExtraction()" disabled>
+        ⚡ EXTRACT DATA
+      </button>
+
+    </div>
+    <!-- /screen0 -->
+
+    <!-- ══ SCREEN 1: PROCESSING ══ -->
+    <div class="screen" id="screen1">
+      <div class="step-heading">
+        <div class="sec-label">Step 02 / Processing</div>
+        <h1>READING <em>IMAGE</em></h1>
+        <p id="procSub">Sending to AI vision model…</p>
+      </div>
+
+      <div class="processing-card">
+        <img id="procThumb" class="proc-thumb" src="" alt="">
+        <div class="spinner"></div>
+        <div class="proc-title pulsing" id="procTitle">Analysing…</div>
+        <div class="proc-sub" id="procDetail">Extracting tabular data from your image</div>
+      </div>
+
+      <div id="retryBadge" style="display:none;" class="retry-badge">
+        ⏳ Rate limited — retrying in <span id="retryCount">4</span>s…
+      </div>
+
+      <button class="btn ghost full" onclick="cancelExtraction()">Cancel</button>
+    </div>
+    <!-- /screen1 -->
+
+    <!-- ══ SCREEN 2: RESULTS ══ -->
+    <div class="screen" id="screen2">
+      <div class="step-heading">
+        <div class="sec-label">Step 03 / Results</div>
+        <h1>DATA <em>READY</em></h1>
+      </div>
+
+      <!-- STATS -->
+      <div class="result-stats">
+        <div class="stat-pill">
+          <div class="val" id="statRows">—</div>
+          <div class="lbl">Rows</div>
+        </div>
+        <div class="stat-pill">
+          <div class="val" id="statCols">—</div>
+          <div class="lbl">Cols</div>
+        </div>
+        <div class="stat-pill">
+          <div class="val" id="statConfidence">✓</div>
+          <div class="lbl">Extracted</div>
+        </div>
+      </div>
+
+      <!-- TABLE PREVIEW -->
+      <div class="csv-preview-box">
+        <div class="csv-preview-head">
+          <span>Extracted Data</span>
+          <button class="csv-edit-btn" onclick="toggleRawEdit()">EDIT RAW</button>
+        </div>
+        <div id="tableViewWrap" class="csv-table-wrap">
+          <table class="csv-table" id="resultTable"></table>
+        </div>
+        <div id="rawEditWrap" style="display:none; padding:8px;">
+          <textarea class="raw-csv" id="rawCsv" oninput="syncFromRaw()"></textarea>
+        </div>
+      </div>
+
+      <!-- ACTIONS -->
+      <div class="action-grid">
+        <button class="btn success" onclick="copyCSV()">📋 Copy CSV</button>
+        <button class="btn" onclick="downloadCSV()">💾 Download</button>
+      </div>
+
+      <!-- SUFFIX TOOL -->
+      <div class="tool-section" id="suffixTool">
+        <div class="tool-section-head" onclick="toggleTool('suffixTool')">
+          <span class="tool-num">01</span>
+          <span class="tool-name">Suffix Appender</span>
+          <span class="tool-chevron">▶</span>
+        </div>
+        <div class="tool-body-inner">
+          <div>
+            <label style="font-family:var(--mono); font-size:0.62rem; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; display:block; margin-bottom:8px;">Preset</label>
+            <div class="chip-row" id="suffixChips">
+              <div class="chip" onclick="setSuffix(this,',STN100')">,STN100</div>
+              <div class="chip" onclick="setSuffix(this,',PNT00')">,PNT00</div>
+              <div class="chip" onclick="setSuffix(this,',CTRL')">,CTRL</div>
+              <div class="chip" onclick="setSuffix(this,',BM')">,BM</div>
+            </div>
+          </div>
+          <div>
+            <label style="font-family:var(--mono); font-size:0.62rem; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; display:block; margin-bottom:4px;">Custom</label>
+            <input type="text" id="customSuffix" placeholder=",MYCODE"
+              style="width:100%; font-family:var(--mono); font-size:0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); padding:10px 12px; outline:none; caret-color:var(--amber);"
+              oninput="clearSuffixChips()">
+          </div>
+          <div>
+            <label style="font-family:var(--mono); font-size:0.62rem; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; display:block; margin-bottom:4px;">Apply To</label>
+            <select id="suffixTarget"
+              style="width:100%; font-family:var(--mono); font-size:0.78rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); padding:10px 12px; outline:none;">
+              <option value="data" selected>Data rows only (skip header)</option>
+              <option value="all">All rows (including header)</option>
+            </select>
+          </div>
+          <div class="action-grid">
+            <button class="btn primary" onclick="applySuffix()">Apply</button>
+            <button class="btn ghost" onclick="resetSuffix()">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEW SCAN BUTTON -->
+      <button class="btn full" onclick="newScan()">↩ New Scan</button>
+    </div>
+    <!-- /screen2 -->
+
+    <!-- ══ ERROR SCREEN ══ -->
+    <div class="screen" id="screenErr">
+      <div class="step-heading">
+        <div class="sec-label">Error</div>
+        <h1>SOME<em>THING</em><br>WENT WRONG</h1>
+      </div>
+      <div class="error-card">
+        <div class="error-title">⚠ Extraction Failed</div>
+        <div class="error-msg" id="errMsg">Unknown error</div>
+      </div>
+      <button class="btn primary full" onclick="goTo(0)">↩ Try Again</button>
+    </div>
+
+  </div><!-- /content -->
+
+</div><!-- /app -->
+
+<div class="toast" id="toast"></div>
+
 <script>
-  // ---------------------------
-  // Map setup (Satellite)
-  // ---------------------------
-  const map = L.map('map', { zoomControl: true }).setView([52.2, 0.9], 13);
-  L.tileLayer(
-    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { maxZoom: 20, attribution: 'Tiles © Esri' }
-  ).addTo(map);
+// ── STATE ─────────────────────────────────
+let imageBase64 = null;
+let imageMime   = 'image/jpeg';
+let csvData     = '';
+let cancelFlag  = false;
+let originalCsv = '';
 
-  const geocodeControl = L.Control.geocoder({ defaultMarkGeocode: false }).addTo(map);
-  geocodeControl.on('markgeocode', (e) => map.fitBounds(e.geocode.bbox));
-
-  // ---------------------------
-  // DOM refs
-  // ---------------------------
-  const statusBox = document.getElementById('statusBox');
-  const exportBtn = document.getElementById('exportBtn');
-  const modeBadge = document.getElementById('modeBadge');
-
-  const useCrosshairEl = document.getElementById('useCrosshair');
-  const crosshairEl = document.getElementById('crosshair');
-  const relativeExportEl = document.getElementById('relativeExport');
-  const snap10El = document.getElementById('snap10');
-
-  const gridSpacingEl = document.getElementById('gridSpacing');
-  const spacingHintEl = document.getElementById('spacingHint');
-
-  const circleRadiusEl = document.getElementById('circleRadius');
-
-  const gridLayerEl = document.getElementById('gridLayer');
-  const shapeLayerEl = document.getElementById('shapeLayer');
-  const simplifyTolEl = document.getElementById('simplifyTol');
-
-  const shapeInfoEl = document.getElementById('shapeInfo');
-  const gridAngDegEl = document.getElementById('gridAngDeg');
-  const circleInfoEl = document.getElementById('circleInfo');
-
-  const rect3Btn = document.getElementById('rect3Btn');
-  const polyBtn = document.getElementById('polyBtn');
-  const circleBtn = document.getElementById('circleBtn');
-
-  const finishShapeBtn = document.getElementById('finishShapeBtn');
-  const undoBtn = document.getElementById('undoBtn');
-  const clearShapeBtn = document.getElementById('clearShapeBtn');
-  const pickAngleBtn = document.getElementById('pickAngleBtn');
-
-  function getGridOriMode(){
-    return document.querySelector('input[name="gridOri"]:checked')?.value || 'shape';
+// ── NAVIGATION ────────────────────────────
+function goTo(n) {
+  document.querySelectorAll('.screen').forEach((s, i) => {
+    s.classList.toggle('active', i === n || (n === 'err' && s.id === 'screenErr'));
+  });
+  if (n === 'err') {
+    updateDots(-1);
+    return;
   }
+  updateDots(n);
+  document.getElementById('mainContent').scrollTop = 0;
+}
 
-  // ---------------------------
-  // Variable spacing logic
-  // ---------------------------
-  function getSpacingMeters(){
-    if (snap10El.checked) return 10.0;
-    const v = parseFloat(gridSpacingEl.value);
-    return (Number.isFinite(v) && v > 0) ? v : NaN;
+function updateDots(n) {
+  [0,1,2].forEach(i => {
+    const d = document.getElementById('dot'+i);
+    d.className = 'step-dot';
+    if (i < n) d.classList.add('done');
+    else if (i === n) d.classList.add('active');
+  });
+}
+
+// ── API KEY ───────────────────────────────
+function saveKey() {
+  const v = document.getElementById('apiKey').value.trim();
+  if (v) {
+    localStorage.setItem('sl_key', v);
+    document.getElementById('apiStatus').textContent = '✓ Key saved on device';
+    document.getElementById('apiStatus').className = 'api-status ok';
+  } else {
+    localStorage.removeItem('sl_key');
+    document.getElementById('apiStatus').textContent = 'Key saved in device storage only';
+    document.getElementById('apiStatus').className = 'api-status';
   }
-  function applySpacingUIState(){
-    if (snap10El.checked){
-      gridSpacingEl.value = '10';
-      gridSpacingEl.disabled = true;
-      spacingHintEl.textContent = 'Locked to 10.000m (snap ON)';
-    } else {
-      gridSpacingEl.disabled = false;
-      spacingHintEl.textContent = 'Variable spacing (snap OFF)';
+  checkReady();
+}
+function loadKey() {
+  const k = localStorage.getItem('sl_key');
+  if (k) {
+    document.getElementById('apiKey').value = k;
+    document.getElementById('apiStatus').textContent = '✓ Key saved on device';
+    document.getElementById('apiStatus').className = 'api-status ok';
+  }
+}
+function toggleKey() {
+  const el = document.getElementById('apiKey');
+  const btn = document.getElementById('keyBtn');
+  if (el.type === 'password') { el.type = 'text'; btn.textContent = 'HIDE'; }
+  else { el.type = 'password'; btn.textContent = 'SHOW'; }
+}
+
+// ── IMAGE HANDLING ────────────────────────
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('Read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function onFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  await loadImage(file);
+}
+
+async function loadImage(file) {
+  try {
+    const b64 = await fileToBase64(file);
+    imageBase64 = b64;
+    imageMime = file.type || 'image/jpeg';
+    showImagePreview(b64, imageMime);
+    checkReady();
+  } catch(e) {
+    showToast('Failed to load image', true);
+  }
+}
+
+function showImagePreview(b64, mime) {
+  const zone = document.getElementById('captureZone');
+  const img  = document.getElementById('imgPreview');
+  const prompt = document.getElementById('capturePrompt');
+  const clearBtn = document.getElementById('clearImgBtn');
+
+  img.src = `data:${mime};base64,${b64}`;
+  img.style.display = 'block';
+  prompt.style.display = 'none';
+  clearBtn.style.display = 'block';
+  zone.classList.add('has-image');
+  zone.onclick = null; // disable tap to open while image showing
+}
+
+function clearImage(e) {
+  if (e) e.stopPropagation();
+  imageBase64 = null;
+  const zone = document.getElementById('captureZone');
+  document.getElementById('imgPreview').style.display = 'none';
+  document.getElementById('imgPreview').src = '';
+  document.getElementById('capturePrompt').style.display = '';
+  document.getElementById('clearImgBtn').style.display = 'none';
+  document.getElementById('fileCamera').value = '';
+  document.getElementById('fileGallery').value = '';
+  zone.classList.remove('has-image');
+  zone.onclick = () => triggerUpload();
+  checkReady();
+}
+
+function triggerUpload() {
+  // on mobile show gallery; on desktop show file picker
+  document.getElementById('fileGallery').click();
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('captureZone').classList.add('dragging');
+}
+function onDragLeave() {
+  document.getElementById('captureZone').classList.remove('dragging');
+}
+async function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('captureZone').classList.remove('dragging');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) await loadImage(file);
+}
+
+// Paste anywhere
+document.addEventListener('paste', async (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (file) { await loadImage(file); showToast('✓ Image pasted'); }
+      break;
     }
   }
-  function getCircleRadius(){
-    const r = parseFloat(circleRadiusEl.value);
-    return (Number.isFinite(r) && r > 0) ? r : NaN;
-  }
+});
 
-  // ---------------------------
-  // OSGB36(15) / OSTN15
-  // ---------------------------
-  const OSTN15_TIFF_URL = 'https://cdn.proj.org/uk_os_OSTN15_NTv2_OSGBtoETRS.tif';
-  const EPSG27700_DEF_BASE =
-    '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 ' +
-    '+x_0=400000 +y_0=-100000 +ellps=airy +units=m +no_defs +type=crs';
+// ── READY STATE ───────────────────────────
+function checkReady() {
+  const key = document.getElementById('apiKey').value.trim();
+  const btn = document.getElementById('extractBtn');
+  btn.disabled = !(imageBase64 && key);
+}
 
-  proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
+// ── HEADER HINT CHIPS ─────────────────────
+function setHint(el, val) {
+  document.querySelectorAll('#hintChips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('headerHint').value = val;
+}
 
-  async function loadOSTN15() {
+// ── EXTRACTION ────────────────────────────
+async function startExtraction() {
+  if (!imageBase64) return;
+  const key = document.getElementById('apiKey').value.trim();
+  if (!key) { showToast('Add your API key first', true); return; }
+
+  cancelFlag = false;
+  goTo(1);
+
+  // set thumb
+  document.getElementById('procThumb').src = `data:${imageMime};base64,${imageBase64}`;
+
+  const hint = document.getElementById('headerHint').value.trim();
+  const prompt = `You are a survey data extraction assistant.
+Look at this image and extract ALL the tabular/columnar data you can see into CSV format.
+${hint ? `The columns should be: ${hint}` : 'Infer column names from context or use ID,Col1,Col2,Col3.'}
+Rules:
+- Output ONLY raw CSV text — no markdown, no backticks, no explanation.
+- First row must be the header.
+- Preserve point IDs exactly as shown.
+- Comma delimiter. Missing value = empty cell (two commas).
+- No trailing commas.`;
+
+  const MAX = 3;
+  for (let attempt = 1; attempt <= MAX; attempt++) {
+    if (cancelFlag) { goTo(0); return; }
+
+    document.getElementById('procTitle').textContent = attempt === 1 ? 'Analysing…' : `Retry ${attempt-1}…`;
+    document.getElementById('procDetail').textContent = 'Extracting tabular data from your image';
+    document.getElementById('retryBadge').style.display = 'none';
+
     try {
-      statusBox.textContent = 'Loading OSTN15 grid (needs internet)…';
-      const tiff = await GeoTIFF.fromUrl(OSTN15_TIFF_URL);
-      await proj4.nadgrid('OSTN15_NTv2_OSGBtoETRS', tiff).ready;
-      proj4.defs('EPSG:27700', EPSG27700_DEF_BASE + ' +nadgrids=OSTN15_NTv2_OSGBtoETRS');
-      statusBox.textContent = 'OSTN15 loaded ✅ (OSGB36(15) accurate)';
-      exportBtn.disabled = false;
-      redrawAll();
-    } catch (e) {
-      console.error(e);
-      statusBox.textContent = 'OSTN15 failed ⚠️ Using fallback (not survey-grade). Host via HTTPS.';
-      proj4.defs(
-        'EPSG:27700',
-        '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 ' +
-        '+x_0=400000 +y_0=-100000 +ellps=airy ' +
-        '+towgs84=446.448,-125.157,542.06,0.15,0.247,0.842,-20.489 ' +
-        '+units=m +no_defs +type=crs'
-      );
-      exportBtn.disabled = false;
-      redrawAll();
-    }
-  }
-
-  // ---------------------------
-  // Helpers / vector ops
-  // ---------------------------
-  function crosshairLatLng() { return map.getCenter(); }
-  function getPickLatLng(clickLatLng) { return useCrosshairEl.checked ? crosshairLatLng() : clickLatLng; }
-
-  function latLngToEN(latlng) {
-    const out = proj4('EPSG:4326', 'EPSG:27700', [latlng.lng, latlng.lat]);
-    return { e: out[0], n: out[1] };
-  }
-  function enToLatLng(e, n) {
-    const out = proj4('EPSG:27700', 'EPSG:4326', [e, n]);
-    return L.latLng(out[1], out[0]);
-  }
-
-  function hypot2(de, dn) { return Math.sqrt(de*de + dn*dn); }
-  function dot(a,b){ return a.e*b.e + a.n*b.n; }
-  function sub(a,b){ return {e:a.e-b.e, n:a.n-b.n}; }
-  function add(a,b){ return {e:a.e+b.e, n:a.n+b.n}; }
-  function mul(a,s){ return {e:a.e*s, n:a.n*s}; }
-  function unit(v){
-    const L = hypot2(v.e, v.n);
-    if (L < 1e-12) return null;
-    return {e: v.e/L, n: v.n/L};
-  }
-
-  // ✅ ORTHO TRUE NORTH (CAD-perfect)
-  function pageNorthBasisAtLatLng(_latlng){
-    return { gx: {e: 1, n: 0}, gy: {e: 0, n: 1} };
-  }
-
-  function basisFromBaselineU(u){
-    const gx = unit(u);
-    if (!gx) return null;
-    const gy = { e: -gx.n, n: gx.e }; // exact perpendicular
-    return { gx, gy };
-  }
-
-  // ---------------------------
-  // Layers
-  // ---------------------------
-  const shapeLayer = L.layerGroup().addTo(map);
-  const gridLayer = L.layerGroup().addTo(map);
-  const pickLayer = L.layerGroup().addTo(map);
-
-  // ---------------------------
-  // State
-  // ---------------------------
-  let mode = 'idle'; // idle | rect3 | poly | pickAngle | circle
-  function setMode(m){
-    mode = m;
-    modeBadge.textContent =
-      m === 'rect3' ? 'rect: pick P1' :
-      m === 'poly' ? 'poly: click points' :
-      m === 'pickAngle' ? 'pick angle' :
-      m === 'circle' ? 'circle: pick centre' :
-      'idle';
-  }
-
-  let shapeType = null;     // 'rect' | 'poly' | 'circle' | null
-  let polyEN = [];
-
-  let rP1=null, rP2=null, rP3=null;
-  let rectU=null, rectLen=0, rectWid=0;
-  let rectCornersEN=null;
-
-  // Circle boundary state
-  let circleCenterEN = null;
-  let circleRadiusM = NaN;
-
-  let a1=null, a2=null;
-  let pickedBasis = null;
-
-  let gridAngleRad = 0;
-  let gridBasis = null;
-  let exportOriginEN = null;
-
-  function setShapeInfo(text){ shapeInfoEl.textContent = text; }
-  function setCircleInfo(text){ circleInfoEl.textContent = text; }
-  function updateGridAngleDisplay(){
-    gridAngDegEl.textContent = (gridAngleRad*180/Math.PI).toFixed(3);
-  }
-
-  function drawPickPoint(latlng, label) {
-    const m = L.circleMarker(latlng, { radius: 6, weight: 2, opacity: 0.95, fillOpacity: 0.25 }).addTo(pickLayer);
-    m.bindTooltip(label, { permanent: true, direction: 'top', offset: [0,-8] });
-  }
-
-  function computeRectFrom3Pts(p1,p2,p3){
-    const v = sub(p2,p1);
-    const L = hypot2(v.e,v.n);
-    if (L < 0.001) return null;
-    const u = unit(v);
-
-    const w0 = { e: -u.n, n: u.e }; // perp left
-    const widthSigned = dot(sub(p3,p1), w0);
-    const W = Math.abs(widthSigned);
-    if (W < 0.001) return null;
-
-    const w = widthSigned >= 0 ? w0 : mul(w0, -1);
-
-    const c1 = p1;
-    const c2 = p2;
-    const c3 = add(p2, mul(w, W));
-    const c4 = add(p1, mul(w, W));
-    return {u,L,W,corners:[c1,c2,c3,c4]};
-  }
-
-  function drawShapeClosed(){
-    shapeLayer.clearLayers();
-
-    if (shapeType === 'rect' && rectCornersEN){
-      const ring = [...rectCornersEN, rectCornersEN[0]].map(p => enToLatLng(p.e,p.n));
-      L.polyline(ring, {weight:3, opacity:0.9}).addTo(shapeLayer);
+      const result = await callAPI(key, imageBase64, imageMime, prompt);
+      if (cancelFlag) { goTo(0); return; }
+      csvData = result;
+      originalCsv = result;
+      showResults(result);
       return;
-    }
-
-    if (shapeType === 'poly' && polyEN.length>=2){
-      const ring = polyEN.map(p => enToLatLng(p.e,p.n));
-      L.polyline(ring, {weight:3, opacity:0.9}).addTo(shapeLayer);
-      return;
-    }
-
-    if (shapeType === 'circle' && circleCenterEN && Number.isFinite(circleRadiusM) && circleRadiusM > 0){
-      const ll = enToLatLng(circleCenterEN.e, circleCenterEN.n);
-      L.circle(ll, { radius: circleRadiusM, weight:3, opacity:0.9, fillOpacity:0.0 }).addTo(shapeLayer);
-      L.circleMarker(ll, { radius: 6, weight:2, opacity:0.95, fillOpacity:0.25 }).addTo(shapeLayer);
-      return;
-    }
-  }
-
-  function shapeBoundsEN(){
-    if (shapeType === 'rect' && rectCornersEN){
-      let minE=Infinity, minN=Infinity, maxE=-Infinity, maxN=-Infinity;
-      for (const p of rectCornersEN){
-        minE=Math.min(minE,p.e); minN=Math.min(minN,p.n);
-        maxE=Math.max(maxE,p.e); maxN=Math.max(maxN,p.n);
-      }
-      return {minE,minN,maxE,maxN};
-    }
-
-    if (shapeType === 'poly' && polyEN.length>=3){
-      let minE=Infinity, minN=Infinity, maxE=-Infinity, maxN=-Infinity;
-      for (const p of polyEN){
-        minE=Math.min(minE,p.e); minN=Math.min(minN,p.n);
-        maxE=Math.max(maxE,p.e); maxN=Math.max(maxN,p.n);
-      }
-      return {minE,minN,maxE,maxN};
-    }
-
-    if (shapeType === 'circle' && circleCenterEN && Number.isFinite(circleRadiusM) && circleRadiusM > 0){
-      const c = circleCenterEN, r = circleRadiusM;
-      return { minE: c.e - r, maxE: c.e + r, minN: c.n - r, maxN: c.n + r };
-    }
-
-    return null;
-  }
-
-  function resolveGridBasis(){
-    const ori = getGridOriMode();
-
-    // For circle there is no baseline; "shape baseline" should behave like north-up.
-    const shapeHasBaseline = (shapeType === 'rect' && rectU);
-
-    // choose a reference point for any north/picked basis
-    let refLL = null;
-    if (shapeType === 'rect' && rP1) refLL = enToLatLng(rP1.e, rP1.n);
-    else if (shapeType === 'poly' && polyEN.length){
-      let se=0,sn=0;
-      for (const p of polyEN){ se+=p.e; sn+=p.n; }
-      refLL = enToLatLng(se/polyEN.length, sn/polyEN.length);
-    } else if (shapeType === 'circle' && circleCenterEN){
-      refLL = enToLatLng(circleCenterEN.e, circleCenterEN.n);
-    } else {
-      refLL = map.getCenter();
-    }
-
-    if (ori === 'north'){
-      gridBasis = pageNorthBasisAtLatLng(refLL) || {gx:{e:1,n:0}, gy:{e:0,n:1}};
-    } else if (ori === 'picked'){
-      gridBasis = pickedBasis || pageNorthBasisAtLatLng(refLL) || {gx:{e:1,n:0}, gy:{e:0,n:1}};
-    } else {
-      if (shapeHasBaseline){
-        gridBasis = basisFromBaselineU(rectU);
-      } else {
-        gridBasis = pageNorthBasisAtLatLng(refLL) || {gx:{e:1,n:0}, gy:{e:0,n:1}};
-      }
-    }
-
-    gridAngleRad = Math.atan2(gridBasis.gy.e, gridBasis.gy.n);
-    updateGridAngleDisplay();
-  }
-
-  // ---------------------------
-  // Polygon clipping helpers
-  // ---------------------------
-  function segmentIntersection(p, r, q, s){
-    const rxs = r.e*s.n - r.n*s.e;
-    const qmp = sub(q,p);
-    if (Math.abs(rxs) < 1e-12) return null;
-    const t = (qmp.e*s.n - qmp.n*s.e) / rxs;
-    const u = (qmp.e*r.n - qmp.n*r.e) / rxs;
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1){
-      return {t, pt: add(p, mul(r, t))};
-    }
-    return null;
-  }
-
-  function pointInPolygon(pt, poly){
-    let inside = false;
-    for (let i=0, j=poly.length-1; i<poly.length; j=i++){
-      const xi=poly[i].e, yi=poly[i].n;
-      const xj=poly[j].e, yj=poly[j].n;
-      const intersect = ((yi>pt.n) !== (yj>pt.n)) &&
-        (pt.e < (xj-xi) * (pt.n-yi) / ((yj-yi)||1e-12) + xi);
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  }
-
-  function clipLineToPolygon(lineA, lineB, poly){
-    const d = sub(lineB, lineA);
-    const hits = [];
-
-    for (let i=0; i<poly.length; i++){
-      const p1 = poly[i];
-      const p2 = poly[(i+1)%poly.length];
-      const e = sub(p2,p1);
-      const hit = segmentIntersection(lineA, d, p1, e);
-      if (hit) hits.push({t: hit.t, pt: hit.pt});
-    }
-
-    hits.push({t:0, pt: lineA});
-    hits.push({t:1, pt: lineB});
-    hits.sort((a,b)=>a.t-b.t);
-
-    const uniq = [];
-    for (const h of hits){
-      const last = uniq[uniq.length-1];
-      if (!last || Math.abs(h.t-last.t) > 1e-7) uniq.push(h);
-    }
-
-    const segs = [];
-    for (let i=0; i<uniq.length-1; i++){
-      const t0 = uniq[i].t, t1 = uniq[i+1].t;
-      if (t1 - t0 < 1e-8) continue;
-      const mid = add(lineA, mul(d, (t0+t1)/2));
-      if (pointInPolygon(mid, poly)){
-        segs.push({a: uniq[i].pt, b: uniq[i+1].pt});
-      }
-    }
-    return segs;
-  }
-
-  // ---------------------------
-  // Circle clipping helper
-  // ---------------------------
-  function clipLineToCircle(A, B, C, r){
-    // Returns 0 or 1 segment(s) of AB that lie inside the circle.
-    const d = sub(B, A);          // direction
-    const f = sub(A, C);          // from centre to A
-
-    const a = dot(d,d);
-    if (a < 1e-12) return [];
-
-    const b = 2 * dot(f,d);
-    const c = dot(f,f) - r*r;
-
-    const disc = b*b - 4*a*c;
-    if (disc < 0) {
-      // No intersections; either fully inside or outside.
-      const Ainside = (dot(sub(A,C), sub(A,C)) <= r*r);
-      const Binside = (dot(sub(B,C), sub(B,C)) <= r*r);
-      return (Ainside && Binside) ? [{a:A, b:B}] : [];
-    }
-
-    const s = Math.sqrt(disc);
-    const t1 = (-b - s) / (2*a);
-    const t2 = (-b + s) / (2*a);
-
-    const lo = Math.max(0, Math.min(t1,t2));
-    const hi = Math.min(1, Math.max(t1,t2));
-
-    // segment of parameter t inside circle is [lo, hi], but only if it has length
-    if (hi < 0 || lo > 1 || hi - lo < 1e-12) {
-      // Might still be fully inside (t range could miss 0..1)
-      const Ainside = (dot(sub(A,C), sub(A,C)) <= r*r);
-      const Binside = (dot(sub(B,C), sub(B,C)) <= r*r);
-      return (Ainside && Binside) ? [{a:A, b:B}] : [];
-    }
-
-    const P = add(A, mul(d, lo));
-    const Q = add(A, mul(d, hi));
-
-    return [{a:P, b:Q}];
-  }
-
-  // ---------------------------
-  // Draw grid (preview)
-  // ---------------------------
-  function redrawAll(){
-    gridLayer.clearLayers();
-    drawShapeClosed();
-
-    const hasBoundary =
-      (shapeType === 'rect' && rectCornersEN) ||
-      (shapeType === 'poly' && polyEN.length>=3) ||
-      (shapeType === 'circle' && circleCenterEN && Number.isFinite(circleRadiusM) && circleRadiusM > 0);
-
-    if (!hasBoundary) return;
-
-    resolveGridBasis();
-
-    const spacing = getSpacingMeters();
-    if (!Number.isFinite(spacing) || spacing <= 0) return;
-
-    // export origin for relative mode:
-    exportOriginEN =
-      (shapeType === 'rect' && rP1) ? rP1 :
-      (shapeType === 'poly' && polyEN.length) ? polyEN[0] :
-      (shapeType === 'circle' && circleCenterEN) ? circleCenterEN :
-      null;
-
-    const b = shapeBoundsEN();
-    if (!b) return;
-
-    const pad = Math.max(50, spacing*2);
-    const minE = b.minE - pad, maxE = b.maxE + pad;
-    const minN = b.minN - pad, maxN = b.maxN + pad;
-
-    const gx = gridBasis.gx, gy = gridBasis.gy;
-
-    function toGrid(p){ return {x: dot(p,gx), y: dot(p,gy)}; }
-    function fromGrid(x,y){ return add(mul(gx,x), mul(gy,y)); }
-
-    const corners = [
-      {e:minE,n:minN},{e:maxE,n:minN},{e:maxE,n:maxN},{e:minE,n:maxN}
-    ];
-    let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-    for (const c of corners){
-      const g = toGrid(c);
-      minX=Math.min(minX,g.x); maxX=Math.max(maxX,g.x);
-      minY=Math.min(minY,g.y); maxY=Math.max(maxY,g.y);
-    }
-
-    const startX = Math.floor(minX/spacing)*spacing;
-    const endX   = Math.ceil(maxX/spacing)*spacing;
-    const startY = Math.floor(minY/spacing)*spacing;
-    const endY   = Math.ceil(maxY/spacing)*spacing;
-
-    const big = hypot2(maxE-minE, maxN-minN) * 2;
-
-    function drawSeg(a,b){
-      L.polyline([enToLatLng(a.e,a.n), enToLatLng(b.e,b.n)], {weight:2, opacity:0.85}).addTo(gridLayer);
-    }
-
-    function clipAndDraw(A,B2){
-      let segs = [];
-      if (shapeType === 'rect' && rectCornersEN) segs = clipLineToPolygon(A,B2,rectCornersEN);
-      else if (shapeType === 'poly' && polyEN.length>=3) segs = clipLineToPolygon(A,B2,polyEN);
-      else if (shapeType === 'circle' && circleCenterEN) segs = clipLineToCircle(A,B2,circleCenterEN,circleRadiusM);
-
-      for (const s of segs) drawSeg(s.a, s.b);
-    }
-
-    for (let x = startX; x <= endX + 1e-9; x += spacing){
-      const A = fromGrid(x, startY - big);
-      const B2 = fromGrid(x, endY + big);
-      clipAndDraw(A,B2);
-    }
-    for (let y = startY; y <= endY + 1e-9; y += spacing){
-      const A = fromGrid(startX - big, y);
-      const B2 = fromGrid(endX + big, y);
-      clipAndDraw(A,B2);
-    }
-  }
-
-  // ---------------------------
-  // Boundary simplify helpers (poly only)
-  // ---------------------------
-  function removeNearDuplicates(pts, eps=0.001){
-    const out = [];
-    for (const p of pts){
-      const last = out[out.length-1];
-      if (!last || Math.abs(p.e-last.e) > eps || Math.abs(p.n-last.n) > eps){
-        out.push(p);
-      }
-    }
-    return out;
-  }
-
-  function rdpSimplify(points, tol){
-    if (tol <= 0 || points.length < 3) return points;
-
-    function distPointToSegment(p, a, b){
-      const ab = sub(b,a);
-      const ap = sub(p,a);
-      const ab2 = dot(ab,ab);
-      let t = ab2 ? dot(ap,ab)/ab2 : 0;
-      t = Math.max(0, Math.min(1,t));
-      const proj = add(a, mul(ab,t));
-      return hypot2(p.e-proj.e, p.n-proj.n);
-    }
-
-    function rdp(pts){
-      let maxD = 0, idx = -1;
-      const a = pts[0], b = pts[pts.length-1];
-      for (let i=1; i<pts.length-1; i++){
-        const d = distPointToSegment(pts[i], a, b);
-        if (d > maxD){ maxD=d; idx=i; }
-      }
-      if (maxD > tol && idx !== -1){
-        const left = rdp(pts.slice(0, idx+1));
-        const right = rdp(pts.slice(idx));
-        return left.slice(0,-1).concat(right);
-      }
-      return [a,b];
-    }
-
-    return rdp(points);
-  }
-
-  // ---------------------------
-  // DXF export
-  // ---------------------------
-  const DXF_COLOR_RED = 1;
-  const DXF_COLOR_BLUE = 5;
-  const EOL = "\r\n";
-
-  function dxfLineEntity(x1, y1, x2, y2, layer, aciColor) {
-    if (![x1,y1,x2,y2].every(Number.isFinite)) return "";
-    return [
-      "0","LINE",
-      "8", layer,
-      "62", String(aciColor),
-      "10", x1.toFixed(3),
-      "20", y1.toFixed(3),
-      "30", "0.000",
-      "11", x2.toFixed(3),
-      "21", y2.toFixed(3),
-      "31", "0.000"
-    ].join(EOL) + EOL;
-  }
-
-  function dxfCircleEntity(x, y, r, layer, aciColor){
-    if (![x,y,r].every(Number.isFinite) || r <= 0) return "";
-    return [
-      "0","CIRCLE",
-      "8", layer,
-      "62", String(aciColor),
-      "10", x.toFixed(3),
-      "20", y.toFixed(3),
-      "30", "0.000",
-      "40", r.toFixed(3)
-    ].join(EOL) + EOL;
-  }
-
-  function exportBoundaryAsLines(pointsXY, layer, aciColor, closed=true) {
-    let out = "";
-    if (!pointsXY || pointsXY.length < 2) return out;
-
-    for (let i = 0; i < pointsXY.length - 1; i++) {
-      const a = pointsXY[i], b = pointsXY[i+1];
-      out += dxfLineEntity(a.x, a.y, b.x, b.y, layer, aciColor);
-    }
-    if (closed && pointsXY.length >= 3) {
-      const a = pointsXY[pointsXY.length - 1];
-      const b = pointsXY[0];
-      out += dxfLineEntity(a.x, a.y, b.x, b.y, layer, aciColor);
-    }
-    return out;
-  }
-
-  function clearStatusLinks(){
-    const links = statusBox.querySelectorAll('a[data-manual-download="1"]');
-    links.forEach(a => a.remove());
-  }
-
-  function exportDXF(){
-    const hasBoundary =
-      (shapeType === 'rect' && rectCornersEN) ||
-      (shapeType === 'poly' && polyEN.length>=3) ||
-      (shapeType === 'circle' && circleCenterEN && Number.isFinite(circleRadiusM) && circleRadiusM > 0);
-
-    if (!hasBoundary){
-      alert('Create a Rectangle, Polygon, or Circle boundary first.');
-      return;
-    }
-
-    resolveGridBasis();
-
-    const spacing = getSpacingMeters();
-    if (!Number.isFinite(spacing) || spacing <= 0){
-      alert('Grid spacing must be > 0');
-      return;
-    }
-
-    const gridLayerName = (gridLayerEl.value || 'GRID').trim();
-    const shpLayerName  = (shapeLayerEl.value || 'BOUNDARY').trim();
-    const rel = !!relativeExportEl.checked;
-
-    exportOriginEN =
-      (shapeType === 'rect' && rP1) ? rP1 :
-      (shapeType === 'poly' && polyEN.length) ? polyEN[0] :
-      (shapeType === 'circle' && circleCenterEN) ? circleCenterEN :
-      null;
-
-    const origin = exportOriginEN;
-
-    function outXY(p){
-      if (!p || !Number.isFinite(p.e) || !Number.isFinite(p.n)) return null;
-      return rel ? {x: p.e-origin.e, y: p.n-origin.n} : {x: p.e, y: p.n};
-    }
-
-    const b = shapeBoundsEN();
-    if (!b){ alert('Shape bounds error'); return; }
-
-    const pad = Math.max(50, spacing*2);
-    const minE = b.minE - pad, maxE = b.maxE + pad;
-    const minN = b.minN - pad, maxN = b.maxN + pad;
-
-    const gx = gridBasis.gx, gy = gridBasis.gy;
-    function toGrid(p){ return {x: dot(p,gx), y: dot(p,gy)}; }
-    function fromGrid(x,y){ return add(mul(gx,x), mul(gy,y)); }
-
-    const corners = [
-      {e:minE,n:minN},{e:maxE,n:minN},{e:maxE,n:maxN},{e:minE,n:maxN}
-    ];
-    let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-    for (const c of corners){
-      const g = toGrid(c);
-      minX=Math.min(minX,g.x); maxX=Math.max(maxX,g.x);
-      minY=Math.min(minY,g.y); maxY=Math.max(maxY,g.y);
-    }
-
-    const startX = Math.floor(minX/spacing)*spacing;
-    const endX   = Math.ceil(maxX/spacing)*spacing;
-    const startY = Math.floor(minY/spacing)*spacing;
-    const endY   = Math.ceil(maxY/spacing)*spacing;
-
-    const big = hypot2(maxE-minE, maxN-minN) * 2;
-
-    let entities = 0;
-
-    let dxf = "";
-    dxf += ["0","SECTION","2","HEADER","9","$INSUNITS","70","6","0","ENDSEC"].join(EOL) + EOL;
-    dxf += ["0","SECTION","2","TABLES","0","ENDSEC"].join(EOL) + EOL;
-    dxf += ["0","SECTION","2","ENTITIES"].join(EOL) + EOL;
-
-    function clipLine(A,B2){
-      if (shapeType === 'rect' && rectCornersEN) return clipLineToPolygon(A,B2,rectCornersEN);
-      if (shapeType === 'poly' && polyEN.length>=3) return clipLineToPolygon(A,B2,polyEN);
-      if (shapeType === 'circle' && circleCenterEN) return clipLineToCircle(A,B2,circleCenterEN,circleRadiusM);
-      return [];
-    }
-
-    // Grid BLUE
-    for (let x = startX; x <= endX + 1e-9; x += spacing){
-      const A = fromGrid(x, startY - big);
-      const B2 = fromGrid(x, endY + big);
-      const segs = clipLine(A,B2);
-      for (const s of segs){
-        const a = outXY(s.a), b2 = outXY(s.b);
-        if (!a || !b2) continue;
-        dxf += dxfLineEntity(a.x,a.y,b2.x,b2.y, gridLayerName, DXF_COLOR_BLUE);
-        entities++;
-      }
-    }
-    for (let y = startY; y <= endY + 1e-9; y += spacing){
-      const A = fromGrid(startX - big, y);
-      const B2 = fromGrid(endX + big, y);
-      const segs = clipLine(A,B2);
-      for (const s of segs){
-        const a = outXY(s.a), b2 = outXY(s.b);
-        if (!a || !b2) continue;
-        dxf += dxfLineEntity(a.x,a.y,b2.x,b2.y, gridLayerName, DXF_COLOR_BLUE);
-        entities++;
-      }
-    }
-
-    // Boundary RED
-    if (shapeType === 'circle' && circleCenterEN){
-      const cxy = outXY(circleCenterEN);
-      if (cxy){
-        dxf += dxfCircleEntity(cxy.x, cxy.y, circleRadiusM, shpLayerName, DXF_COLOR_RED);
-        entities++;
-      }
-    } else {
-      const tol = Math.max(0, parseFloat(simplifyTolEl.value) || 0);
-      let shp = [];
-
-      if (shapeType === 'rect' && rectCornersEN) shp = rectCornersEN.slice();
-      if (shapeType === 'poly' && polyEN.length>=3) shp = polyEN.slice();
-
-      shp = removeNearDuplicates(shp, 0.001);
-
-      if (shp.length >= 3){
-        const closed = shp.concat([shp[0]]);
-        const simplified = rdpSimplify(closed, tol);
-        const finalPts = simplified.slice(0, -1);
-        const ptsXY = finalPts.map(outXY).filter(Boolean);
-        dxf += exportBoundaryAsLines(ptsXY, shpLayerName, DXF_COLOR_RED, true);
-        entities += ptsXY.length;
-      }
-    }
-
-    dxf += ["0","ENDSEC","0","EOF"].join(EOL) + EOL;
-
-    clearStatusLinks();
-    statusBox.textContent = `Export ready. (${entities.toLocaleString()} entities)`;
-
-    const filename = `grid_${shapeType || "none"}_${rel ? "REL" : "OSGB"}_${spacing.toFixed(3)}m.dxf`;
-    const blob = new Blob([dxf], { type: "application/octet-stream" });
-    const url = URL.createObjectURL(blob);
-
-    const manual = document.createElement("a");
-    manual.href = url;
-    manual.download = filename;
-    manual.textContent = `Click here if download didn’t start: ${filename}`;
-    manual.dataset.manualDownload = "1";
-    manual.style.display = "block";
-    manual.style.marginTop = "10px";
-    manual.style.fontWeight = "950";
-    manual.style.color = "#111827";
-    manual.style.textDecoration = "underline";
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.style.display = "none";
-    document.body.appendChild(a);
-
-    statusBox.appendChild(document.createElement("br"));
-    statusBox.appendChild(manual);
-
-    try { a.click(); } catch (e) {}
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 120000);
-  }
-
-  // ---------------------------
-  // UI / buttons / picking
-  // ---------------------------
-  function updateButtons(){
-    const inRectPick = (mode === 'rect3');
-    const inPolyPick = (mode === 'poly');
-
-    const canUndo =
-      (inPolyPick && polyEN.length > 0) ||
-      (inRectPick && (rP1 || rP2 || rP3)) ||
-      (mode === 'pickAngle' && (a1 || a2)) ||
-      (mode === 'circle' && !!circleCenterEN);
-
-    undoBtn.disabled = !canUndo;
-
-    finishShapeBtn.disabled = !(shapeType === 'poly' && polyEN.length >= 3);
-
-    clearShapeBtn.disabled = !(
-      (shapeType==='poly' && polyEN.length) ||
-      (shapeType==='rect' && (rP1||rP2||rP3||rectCornersEN)) ||
-      (shapeType==='circle' && circleCenterEN)
-    );
-  }
-
-  rect3Btn.addEventListener('click', () => {
-    setMode('rect3');
-    shapeType = 'rect';
-
-    polyEN = [];
-    circleCenterEN=null; circleRadiusM=NaN; setCircleInfo('None');
-
-    rP1=rP2=rP3=null;
-    rectU=null; rectLen=0; rectWid=0; rectCornersEN=null;
-    exportOriginEN = null;
-
-    pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
-    setShapeInfo('Rectangle: pick P1');
-    statusBox.textContent = 'Rectangle mode: click P1, then P2, then P3.';
-    updateButtons();
-  });
-
-  polyBtn.addEventListener('click', () => {
-    setMode('poly');
-    shapeType = 'poly';
-
-    circleCenterEN=null; circleRadiusM=NaN; setCircleInfo('None');
-
-    polyEN = [];
-    rP1=rP2=rP3=null;
-    rectU=null; rectCornersEN=null;
-    exportOriginEN = null;
-
-    pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
-    setShapeInfo('Polygon: click points…');
-    statusBox.textContent = 'Polygon mode: click points around boundary, then Finish polygon.';
-    updateButtons();
-  });
-
-  circleBtn.addEventListener('click', () => {
-    setMode('circle');
-    shapeType = 'circle';
-
-    // clear other shapes
-    polyEN = [];
-    rP1=rP2=rP3=null;
-    rectU=null; rectCornersEN=null;
-
-    pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
-    setShapeInfo('Circle: click centre');
-    statusBox.textContent = 'Circle mode: click centre point. Radius comes from the input (m).';
-    updateButtons();
-  });
-
-  finishShapeBtn.addEventListener('click', () => {
-    if (shapeType === 'poly' && polyEN.length >= 3){
-      setMode('idle');
-      setShapeInfo(`Polygon (${polyEN.length} pts)`);
-      statusBox.textContent = 'Polygon finished. Grid clipped inside.';
-      redrawAll();
-      updateButtons();
-    }
-  });
-
-  clearShapeBtn.addEventListener('click', () => {
-    shapeType = null;
-    polyEN = [];
-    rP1=rP2=rP3=null;
-    rectU=null; rectCornersEN=null;
-
-    circleCenterEN=null; circleRadiusM=NaN; setCircleInfo('None');
-
-    a1=a2=null; pickedBasis=null;
-    exportOriginEN = null;
-
-    pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
-    setShapeInfo('None');
-    statusBox.textContent = 'Cleared.';
-    setMode('idle');
-    updateButtons();
-  });
-
-  undoBtn.addEventListener('click', () => {
-    if (mode === 'poly' && shapeType === 'poly' && polyEN.length){
-      polyEN.pop();
-      pickLayer.clearLayers();
-      for (let i=0;i<polyEN.length;i++){
-        drawPickPoint(enToLatLng(polyEN[i].e, polyEN[i].n), `P${i+1}`);
-      }
-      drawShapeClosed();
-      gridLayer.clearLayers();
-      statusBox.textContent = 'Undo: removed last polygon point.';
-      updateButtons();
-      return;
-    }
-
-    if (mode === 'rect3' && shapeType === 'rect'){
-      if (rP3) { rP3=null; rectCornersEN=null; }
-      else if (rP2) { rP2=null; }
-      else if (rP1) { rP1=null; }
-
-      pickLayer.clearLayers();
-      if (rP1) drawPickPoint(enToLatLng(rP1.e,rP1.n),'P1');
-      if (rP2) drawPickPoint(enToLatLng(rP2.e,rP2.n),'P2');
-      if (rP3) drawPickPoint(enToLatLng(rP3.e,rP3.n),'P3');
-
-      shapeLayer.clearLayers();
-      gridLayer.clearLayers();
-
-      setShapeInfo(rP1 ? (rP2 ? 'Rectangle: pick P3' : 'Rectangle: pick P2') : 'Rectangle: pick P1');
-      statusBox.textContent = 'Undo: stepped back one rectangle pick.';
-      updateButtons();
-      return;
-    }
-
-    if (mode === 'pickAngle'){
-      if (a2) a2=null;
-      else if (a1) a1=null;
-      pickLayer.clearLayers();
-      if (a1) drawPickPoint(enToLatLng(a1.e,a1.n),'A1');
-      if (a2) drawPickPoint(enToLatLng(a2.e,a2.n),'A2');
-      statusBox.textContent = 'Undo: stepped back one angle pick.';
-      updateButtons();
-      return;
-    }
-
-    if (mode === 'circle' && shapeType === 'circle'){
-      circleCenterEN = null;
-      circleRadiusM = NaN;
-      setCircleInfo('None');
-      shapeLayer.clearLayers();
-      gridLayer.clearLayers();
-      statusBox.textContent = 'Undo: removed circle centre.';
-      updateButtons();
-      return;
-    }
-  });
-
-  pickAngleBtn.addEventListener('click', () => {
-    setMode('pickAngle');
-    a1=a2=null;
-    statusBox.textContent = 'Pick grid angle: click point 1 then point 2.';
-    modeBadge.textContent = 'angle: pt1';
-    updateButtons();
-  });
-
-  map.on('click', (e) => {
-    const ll = getPickLatLng(e.latlng);
-    const en = latLngToEN(ll);
-
-    if (mode === 'circle' && shapeType === 'circle'){
-      const r = getCircleRadius();
-      if (!Number.isFinite(r) || r <= 0){
-        alert('Circle radius must be > 0 metres');
-        return;
-      }
-      circleCenterEN = en;
-      circleRadiusM = r;
-      setCircleInfo(`Centre set, R=${circleRadiusM.toFixed(3)} m`);
-      setMode('idle');
-      setShapeInfo(`Circle R=${circleRadiusM.toFixed(3)} m`);
-      statusBox.textContent = 'Circle set. Grid clipped inside.';
-      redrawAll();
-      updateButtons();
-      return;
-    }
-
-    if (mode === 'pickAngle'){
-      if (!a1){
-        a1 = en;
-        drawPickPoint(ll, 'A1');
-        modeBadge.textContent = 'angle: pt2';
-        updateButtons();
-        return;
-      }
-      if (!a2){
-        a2 = en;
-        drawPickPoint(ll, 'A2');
-        const u = unit(sub(a2,a1));
-        if (!u){ alert('Bad angle points'); return; }
-        pickedBasis = basisFromBaselineU(u);
-        setMode('idle');
-        statusBox.textContent = 'Picked angle set.';
-        redrawAll();
-        updateButtons();
-        return;
-      }
-      return;
-    }
-
-    if (mode === 'rect3' && shapeType === 'rect'){
-      if (!rP1){
-        rP1 = en;
-        pickLayer.clearLayers();
-        drawPickPoint(ll,'P1');
-        setShapeInfo('Rectangle: pick P2');
-        modeBadge.textContent = 'rect: pick P2';
-        updateButtons();
-        return;
-      }
-      if (!rP2){
-        rP2 = en;
-        drawPickPoint(ll,'P2');
-        setShapeInfo('Rectangle: pick P3');
-        modeBadge.textContent = 'rect: pick P3';
-        updateButtons();
-        return;
-      }
-      if (!rP3){
-        rP3 = en;
-        drawPickPoint(ll,'P3');
-        const res = computeRectFrom3Pts(rP1,rP2,rP3);
-        if (!res){
-          alert('Bad rectangle (points too close / width ~0). Try again.');
-          rP1=rP2=rP3=null;
-          rectCornersEN=null;
-          pickLayer.clearLayers();
-          setShapeInfo('Rectangle: pick P1');
-          modeBadge.textContent = 'rect: pick P1';
-          updateButtons();
-          return;
+    } catch(err) {
+      if (cancelFlag) { goTo(0); return; }
+      if (err.message === 'RATE_LIMIT' && attempt < MAX) {
+        const wait = attempt * 4;
+        document.getElementById('retryBadge').style.display = 'block';
+        for (let s = wait; s > 0; s--) {
+          if (cancelFlag) { goTo(0); return; }
+          document.getElementById('retryCount').textContent = s;
+          await new Promise(r => setTimeout(r, 1000));
         }
-        rectU=res.u; rectLen=res.L; rectWid=res.W; rectCornersEN=res.corners;
-        exportOriginEN = rP1;
-
-        setMode('idle');
-        modeBadge.textContent = 'done';
-        setShapeInfo(`Rectangle ${rectLen.toFixed(2)}×${rectWid.toFixed(2)}m`);
-        statusBox.textContent = 'Rectangle set. Grid clipped inside.';
-        redrawAll();
-        updateButtons();
-        return;
+        continue;
       }
+      // failure
+      document.getElementById('errMsg').textContent = err.message || 'Unknown error';
+      goTo('err');
       return;
     }
+  }
+}
 
-    if (mode === 'poly' && shapeType === 'poly'){
-      polyEN.push(en);
-      drawPickPoint(ll, `P${polyEN.length}`);
-      drawShapeClosed();
-      gridLayer.clearLayers();
-      setShapeInfo(`Polygon: ${polyEN.length} pts`);
-      updateButtons();
-      return;
+function cancelExtraction() {
+  cancelFlag = true;
+  goTo(0);
+}
+
+async function callAPI(apiKey, base64, mime, prompt) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mime, data: base64 } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    clearTimeout(timer);
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      const msg = data?.error?.message || `HTTP ${resp.status}`;
+      if (resp.status === 401) throw new Error('Invalid API key — check console.anthropic.com');
+      if (resp.status === 429) throw new Error('RATE_LIMIT');
+      throw new Error(msg);
     }
+
+    return (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim()
+      .replace(/^```[^\n]*\n?/, '').replace(/```$/, '').trim();
+
+  } catch(err) {
+    clearTimeout(timer);
+    if (err.name === 'AbortError') throw new Error('Request timed out — try again');
+    throw err;
+  }
+}
+
+// ── RESULTS ───────────────────────────────
+function parseCSV(raw) {
+  return raw.trim().split('\n').map(l => l.split(',').map(c => c.trim()));
+}
+
+function showResults(raw) {
+  const rows = parseCSV(raw);
+  const dataRows = rows.slice(1).filter(r => r.some(c => c !== ''));
+  const cols = rows[0] ? rows[0].length : 0;
+
+  document.getElementById('statRows').textContent = dataRows.length;
+  document.getElementById('statCols').textContent = cols;
+  document.getElementById('statConfidence').textContent = '✓';
+
+  renderTable(rows);
+  document.getElementById('rawCsv').value = raw;
+  document.getElementById('rawEditWrap').style.display = 'none';
+  document.getElementById('tableViewWrap').style.display = 'block';
+
+  goTo(2);
+}
+
+function renderTable(rows) {
+  if (!rows || rows.length === 0) return;
+  const headers = rows[0];
+  const data = rows.slice(1).filter(r => r.some(c => c !== ''));
+
+  let html = '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
+  html += '<tbody>';
+  data.forEach(row => {
+    html += '<tr>' + row.map(c => `<td>${c}</td>`).join('') + '</tr>';
   });
+  html += '</tbody>';
+  document.getElementById('resultTable').innerHTML = html;
+}
 
-  // ---------------------------
-  // GPS / reset / export / toggles
-  // ---------------------------
-  document.getElementById('gpsBtn').addEventListener('click', () => {
-    map.locate({ setView: true, maxZoom: 19, enableHighAccuracy: true, timeout: 15000 });
-  });
+let rawEditMode = false;
+function toggleRawEdit() {
+  rawEditMode = !rawEditMode;
+  document.getElementById('rawEditWrap').style.display = rawEditMode ? 'block' : 'none';
+  document.getElementById('tableViewWrap').style.display = rawEditMode ? 'none' : 'block';
+  document.querySelector('.csv-edit-btn').textContent = rawEditMode ? 'SHOW TABLE' : 'EDIT RAW';
+}
 
-  map.on('locationfound', (e) => {
-    if (window._gpsAccuracy) window._gpsAccuracy.remove();
-    window._gpsAccuracy = L.circle(e.latlng, {
-      radius: e.accuracy, weight: 1, opacity: 0.6, fillOpacity: 0.08
-    }).addTo(map);
-    statusBox.textContent = `GPS found (±${Math.round(e.accuracy)}m).`;
-  });
+function syncFromRaw() {
+  csvData = document.getElementById('rawCsv').value;
+  const rows = parseCSV(csvData);
+  renderTable(rows);
+  const dataRows = rows.slice(1).filter(r => r.some(c => c !== ''));
+  document.getElementById('statRows').textContent = dataRows.length;
+  document.getElementById('statCols').textContent = rows[0] ? rows[0].length : 0;
+}
 
-  map.on('locationerror', (e) => {
-    alert("Couldn't get GPS location: " + (e.message || "permission denied / unavailable"));
-  });
+function copyCSV() {
+  navigator.clipboard.writeText(csvData).then(() => showToast('✓ Copied to clipboard'));
+}
 
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    shapeType = null;
-    polyEN = [];
-    rP1=rP2=rP3=null;
-    rectU=null; rectCornersEN=null;
-    circleCenterEN=null; circleRadiusM=NaN; setCircleInfo('None');
-    a1=a2=null; pickedBasis=null;
-    exportOriginEN = null;
+function downloadCSV() {
+  if (!csvData) return;
+  const blob = new Blob([csvData], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `survey_${Date.now()}.csv`;
+  a.click();
+  showToast('✓ Download started');
+}
 
-    pickLayer.clearLayers(); gridLayer.clearLayers(); shapeLayer.clearLayers();
-    setShapeInfo('None');
-    statusBox.textContent = 'Reset.';
-    setMode('idle');
-    updateButtons();
-  });
+function newScan() {
+  csvData = '';
+  originalCsv = '';
+  document.getElementById('rawCsv').value = '';
+  document.getElementById('resultTable').innerHTML = '';
+  goTo(0);
+}
 
-  exportBtn.addEventListener('click', exportDXF);
+// ── SUFFIX TOOL ───────────────────────────
+function toggleTool(id) {
+  document.getElementById(id).classList.toggle('open');
+}
 
-  useCrosshairEl.addEventListener('change', () => {
-    crosshairEl.style.display = useCrosshairEl.checked ? 'block' : 'none';
-  });
+let selectedSuffix = '';
+function setSuffix(el, val) {
+  document.querySelectorAll('#suffixChips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('customSuffix').value = '';
+  selectedSuffix = val;
+}
+function clearSuffixChips() {
+  document.querySelectorAll('#suffixChips .chip').forEach(c => c.classList.remove('active'));
+  selectedSuffix = '';
+}
 
-  snap10El.addEventListener('change', () => { applySpacingUIState(); redrawAll(); });
-  gridSpacingEl.addEventListener('input', redrawAll);
-  circleRadiusEl.addEventListener('input', () => {
-    if (shapeType === 'circle' && circleCenterEN){
-      const r = getCircleRadius();
-      if (Number.isFinite(r) && r > 0){
-        circleRadiusM = r;
-        setCircleInfo(`Centre set, R=${circleRadiusM.toFixed(3)} m`);
-        setShapeInfo(`Circle R=${circleRadiusM.toFixed(3)} m`);
-        redrawAll();
-      }
-    }
-  });
+function applySuffix() {
+  const custom = document.getElementById('customSuffix').value;
+  const suffix = custom || selectedSuffix;
+  if (!suffix) { showToast('Choose or enter a suffix', true); return; }
 
-  document.querySelectorAll('input[name="gridOri"]').forEach(r => r.addEventListener('change', redrawAll));
+  const target = document.getElementById('suffixTarget').value;
+  const rows = csvData.split('\n');
+  const result = rows.map((row, i) => {
+    if (target === 'data' && i === 0) return row;
+    return row.trimEnd() + suffix;
+  }).join('\n');
 
-  // Leaflet resize safety
-  window.addEventListener('resize', () => map.invalidateSize({ animate:false }));
-  setTimeout(() => map.invalidateSize({ animate:false }), 50);
+  csvData = result;
+  document.getElementById('rawCsv').value = result;
+  const parsed = parseCSV(result);
+  renderTable(parsed);
+  showToast('✓ Suffix applied');
+}
 
-  // Startup
-  setMode('idle');
-  updateButtons();
-  applySpacingUIState();
-  loadOSTN15();
-  statusBox.textContent = 'Ready. Choose Rectangle / Polygon / Circle.';
+function resetSuffix() {
+  csvData = originalCsv;
+  document.getElementById('rawCsv').value = originalCsv;
+  const parsed = parseCSV(originalCsv);
+  renderTable(parsed);
+  showToast('✓ Reset to original');
+}
+
+// ── TOAST ─────────────────────────────────
+let toastTimer = null;
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── INIT ──────────────────────────────────
+loadKey();
+checkReady();
+document.getElementById('apiKey').addEventListener('input', checkReady);
 </script>
 </body>
 </html>
