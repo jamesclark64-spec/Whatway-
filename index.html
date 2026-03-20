@@ -1233,10 +1233,10 @@ function copyCSV() {
 
 function downloadCSV() {
   if (!csvData) return;
-  const blob = new Blob([csvData], { type: 'text/csv' });
+  const blob = new Blob([csvData], { type: 'text/plain' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `survey_${Date.now()}.csv`;
+  a.download = `survey_${Date.now()}.txt`;
   a.click();
   showToast('✓ Download started');
 }
