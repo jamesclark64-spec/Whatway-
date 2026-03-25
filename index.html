@@ -743,21 +743,47 @@
         </button>
       </div>
 
-      <!-- COLUMN HINT -->
+      <!-- SOURCE TYPE + HINT CONFIG -->
       <div class="config-card">
         <div>
+          <label>Source Type</label>
+          <div class="chip-row" id="sourceChips">
+            <div class="chip active" onclick="setSource(this,'generic')">📄 Generic Table</div>
+            <div class="chip" onclick="setSource(this,'leica')">🎯 Leica Controller</div>
+          </div>
+        </div>
+
+        <!-- GENERIC OPTIONS -->
+        <div id="genericOpts">
           <label>Column Header Hint</label>
           <input type="text" id="headerHint" value="ID,Easting,Northing,Elevation"
             placeholder="e.g. ID,Easting,Northing,Elevation">
-        </div>
-        <div>
-          <label>Presets</label>
-          <div class="chip-row" id="hintChips">
+          <div class="chip-row" id="hintChips" style="margin-top:8px;">
             <div class="chip active" onclick="setHint(this,'ID,Easting,Northing,Elevation')">ENZ</div>
             <div class="chip" onclick="setHint(this,'ID,Northing,Easting,Elevation')">NEZ</div>
             <div class="chip" onclick="setHint(this,'ID,Easting,Northing')">EN only</div>
             <div class="chip" onclick="setHint(this,'Point,X,Y,Z,Code')">Point+Code</div>
             <div class="chip" onclick="setHint(this,'')">Auto-detect</div>
+          </div>
+        </div>
+
+        <!-- LEICA OPTIONS -->
+        <div id="leicaOpts" style="display:none;">
+          <div style="background:var(--bg); border:1px solid var(--amber-lo); border-radius:var(--radius); padding:12px; display:flex; flex-direction:column; gap:6px;">
+            <div style="font-family:var(--mono); font-size:0.65rem; color:var(--amber); letter-spacing:0.1em; text-transform:uppercase;">Leica Mode Active</div>
+            <div style="font-family:var(--mono); font-size:0.68rem; color:var(--muted); line-height:1.7;">
+              Handles both screen layouts automatically:<br>
+              <span style="color:var(--text);">· List view</span> — labelled Easting / Northing / Height rows<br>
+              <span style="color:var(--text);">· Detail view</span> — point name + stacked values<br>
+              Time and date lines are ignored.
+            </div>
+          </div>
+          <div style="margin-top:10px;">
+            <label>Output columns</label>
+            <div class="chip-row" id="leicaColChips">
+              <div class="chip active" onclick="setLeicaCols(this,'ID,Easting,Northing,Elevation')">ID · E · N · H</div>
+              <div class="chip" onclick="setLeicaCols(this,'ID,Easting,Northing')">ID · E · N only</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1053,11 +1079,62 @@ function checkReady() {
   btn.disabled = !(imageBase64 && key);
 }
 
+// ── SOURCE MODE ───────────────────────────
+let sourceMode = 'generic';
+let leicaCols  = 'ID,Easting,Northing,Elevation';
+
+function setSource(el, mode) {
+  sourceMode = mode;
+  document.querySelectorAll('#sourceChips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('genericOpts').style.display = mode === 'generic' ? '' : 'none';
+  document.getElementById('leicaOpts').style.display   = mode === 'leica'   ? '' : 'none';
+}
+
+function setLeicaCols(el, val) {
+  leicaCols = val;
+  document.querySelectorAll('#leicaColChips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
 // ── HEADER HINT CHIPS ─────────────────────
 function setHint(el, val) {
   document.querySelectorAll('#hintChips .chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('headerHint').value = val;
+}
+
+// ── PROMPT BUILDER ────────────────────────
+function buildPrompt() {
+  if (sourceMode === 'leica') {
+    return `You are a survey data extraction assistant reading a photo of a Leica total station or GPS controller screen.
+
+The screen may show one of two layouts:
+
+LAYOUT A - List view: Multiple points visible, each with a bold point name (e.g. ST01) followed by a line showing "Easting 123456.789 m  Northing 234567.890 m  Height 45.678 m" with the labels explicitly written.
+
+LAYOUT B - Detail view: A single point is shown. The point name appears at the top (often highlighted in green). Below it, values are listed vertically in this order: Easting, Northing, Height (each shown as a bare number followed by " m"). Below the coordinates there may be a time (HH:MM:SS) and a date (DD.MM.YY) - IGNORE those completely.
+
+Output columns: ${leicaCols}
+Rules:
+- Output ONLY raw CSV - no markdown, no backticks, no explanation.
+- First row is the header exactly matching the output columns above.
+- Strip the " m" unit suffix from all numeric values.
+- Preserve point IDs exactly as shown (e.g. ST01, RT03).
+- Comma delimiter. No trailing commas.
+- If the same point appears more than once (duplicate reads), include each occurrence as a separate row.`;
+  }
+
+  const hint = document.getElementById('headerHint').value.trim();
+  return `You are a survey data extraction assistant.
+Look at this image and extract ALL the tabular/columnar data you can see into CSV format.
+${hint ? `The columns should be: ${hint}` : 'Infer column names from context or use ID,Col1,Col2,Col3.'}
+Rules:
+- Output ONLY raw CSV text - no markdown, no backticks, no explanation.
+- First row must be the header.
+- Preserve point IDs exactly as shown.
+- Comma delimiter. Missing value = empty cell (two commas).
+- No trailing commas.`;
 }
 
 // ── EXTRACTION ────────────────────────────
@@ -1072,16 +1149,7 @@ async function startExtraction() {
   // set thumb
   document.getElementById('procThumb').src = `data:${imageMime};base64,${imageBase64}`;
 
-  const hint = document.getElementById('headerHint').value.trim();
-  const prompt = `You are a survey data extraction assistant.
-Look at this image and extract ALL the tabular/columnar data you can see into CSV format.
-${hint ? `The columns should be: ${hint}` : 'Infer column names from context or use ID,Col1,Col2,Col3.'}
-Rules:
-- Output ONLY raw CSV text — no markdown, no backticks, no explanation.
-- First row must be the header.
-- Preserve point IDs exactly as shown.
-- Comma delimiter. Missing value = empty cell (two commas).
-- No trailing commas.`;
+  const prompt = buildPrompt();
 
   const MAX = 3;
   for (let attempt = 1; attempt <= MAX; attempt++) {
